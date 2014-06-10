@@ -29,7 +29,7 @@ const int vocab_hash_size = 30000000;  // Maximum 30 * 0.7 = 21M words in the vo
 typedef float real;                    // Precision of float numbers
 
 struct vocab_word {
- 	long long cn;
+ 	long long cn; //times of occurence in train file
  	int *point;
  	char *word, *code, codelen;
 };
@@ -70,7 +70,8 @@ void InitUnigramTable() {
 		  d1 += pow(vocab[i].cn, power) / (real)train_words_pow;
 		}
 
-		if (i >= vocab_size) i = vocab_size - 1;
+		if (i >= vocab_size)
+			i = vocab_size - 1;
 		}
 }
 
@@ -267,11 +268,11 @@ void CreateBinaryTree() {
 	for (a = 0; a < vocab_size; a++)
 		count[a] = vocab[a].cn;
 
-	for (a = vocab_size; a < vocab_size * 2; a++)
+	for (a = vocab_size; a < vocab_size * 2; a++) //sets rest of count array to 1e15
 		count[a] = 1e15;
 
-	pos1 = vocab_size - 1;
-	pos2 = vocab_size;
+	pos1 = vocab_size - 1; //end of word occurences
+	pos2 = vocab_size; //start of other end
 
 	// Following algorithm constructs the Huffman tree by adding one node at a time
 	for (a = 0; a < vocab_size - 1; a++) {
@@ -556,32 +557,45 @@ void *TrainModelThread(void *id) {
 			sentence_position = 0;
 		}
 
-		if (feof(fi))
+		if (feof(fi)) //end file
 			break;
 
-		if (word_count > train_words / num_threads)
+		if (word_count > train_words / num_threads) //trained all word
 			break;
 
-		word = sen[sentence_position];
+		word = sen[sentence_position]; //index
 
-		if (word == -1)
+		if (word == -1) 
 			continue;
 
-		for (c = 0; c < layer1_size; c++) neu1[c] = 0;
-			for (c = 0; c < layer1_size; c++) neu1e[c] = 0;
-				next_random = next_random * (unsigned long long)25214903917 + 11;
+		for (c = 0; c < layer1_size; c++)
+			neu1[c] = 0;
+
+		for (c = 0; c < layer1_size; c++)
+			neu1e[c] = 0;
+
+		next_random = next_random * (unsigned long long)25214903917 + 11;
 
 		b = next_random % window;
 
+
 		if (cbow) {  //train the cbow architecture
 			// in -> hidden
-			for (a = b; a < window * 2 + 1 - b; a++) if (a != window) {
-				c = sentence_position - window + a;
-				if (c < 0) continue;
-				if (c >= sentence_length) continue;
-				last_word = sen[c];
-				if (last_word == -1) continue;
-				for (c = 0; c < layer1_size; c++) neu1[c] += syn0[c + last_word * layer1_size];
+			for (a = b; a < window * 2 + 1 - b; a++)
+				if (a != window) {
+
+					c = sentence_position - window + a;
+					
+					if (c < 0) continue;
+
+					if (c >= sentence_length) continue;
+
+					last_word = sen[c];
+
+					if (last_word == -1) continue;
+
+					for (c = 0; c < layer1_size; c++)
+						neu1[c] += syn0[c + last_word * layer1_size];
 			}
 
 			if (hs)
@@ -719,8 +733,12 @@ void *TrainModelThread(void *id) {
 							} else {
 								next_random = next_random * (unsigned long long)25214903917 + 11;
 								target = table[(next_random >> 16) % table_size];
-								if (target == 0) target = next_random % (vocab_size - 1) + 1;
-								if (target == word) continue;
+
+								if (target == 0)
+									target = next_random % (vocab_size - 1) + 1;
+
+								if (target == word)
+									continue;
 								label = 0;
 							}
 
@@ -778,7 +796,7 @@ void TrainModel() {
 	if (save_vocab_file[0] != 0)
 		SaveVocab();
 
-	if (output_file[0] == 0)
+	if (output_file[0] == 0) //quit
 		return;
 
 	InitNet();
