@@ -12,6 +12,15 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
+
+/**
+* For more details see:
+*
+* http://arxiv.org/abs/1402.3722
+* http://yinwenpeng.wordpress.com/2013/12/18/word2vec-gradient-calculation/
+* http://yinwenpeng.wordpress.com/2013/09/26/hierarchical-softmax-in-neural-network-language-model/
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,6 +51,7 @@ int *vocab_hash;
 long long vocab_max_size = 1000, vocab_size = 0, layer1_size = 100;
 long long train_words = 0, word_count_actual = 0, file_size = 0, classes = 0;
 real alpha = 0.025, starting_alpha, sample = 0;
+//syn0 = vectors table
 real *syn0, *syn1, *syn1neg, *expTable;
 clock_t start;
 
@@ -499,8 +509,8 @@ void *TrainModelThread(void *id) {
 	real f, g;
 	clock_t now;
 
-	real *neu1 = (real *)calloc(layer1_size, sizeof(real));
-	real *neu1e = (real *)calloc(layer1_size, sizeof(real));
+	real *neu1 = (real *)calloc(layer1_size, sizeof(real)); //one vector
+	real *neu1e = (real *)calloc(layer1_size, sizeof(real)); 
 	FILE *fi = fopen(train_file, "rb");
 
 	fseek(fi, file_size / (long long)num_threads * (long long)id, SEEK_SET);
@@ -544,6 +554,7 @@ void *TrainModelThread(void *id) {
 				if (sample > 0) {
 					real ran = (sqrt(vocab[word].cn / (sample * train_words)) + 1) * (sample * train_words) / vocab[word].cn;
 					next_random = next_random * (unsigned long long)25214903917 + 11;
+					
 					if (ran < (next_random & 0xFFFF) / (real)65536)
 						continue;
 				}
@@ -581,32 +592,33 @@ void *TrainModelThread(void *id) {
 
 		if (cbow) {  //train the cbow architecture
 			// in -> hidden
-			for (a = b; a < window * 2 + 1 - b; a++)
+			for (a = b; a < window * 2 + 1 - b; a++) //a = [0 window]->[(window*2+1)-rand] -> dynamic window
 				if (a != window) {
 
 					c = sentence_position - window + a;
+					printf("%d\n",sentence_position );
 					
 					if (c < 0) continue;
 
 					if (c >= sentence_length) continue;
 
-					last_word = sen[c];
+					last_word = sen[c]; //index of word
 
 					if (last_word == -1) continue;
 
-					for (c = 0; c < layer1_size; c++)
-						neu1[c] += syn0[c + last_word * layer1_size];
+					for (c = 0; c < layer1_size; c++) // c is each vector index
+						neu1[c] += syn0[c + last_word * layer1_size]; //sum of all vectors in input window (fig cbow) -> vectors on hidden
 			}
 
 			if (hs)
 				for (d = 0; d < vocab[word].codelen; d++) {
 					f = 0;
-					l2 = vocab[word].point[d] * layer1_size;
+					l2 = vocab[word].point[d] * layer1_size; //offset of word
 					// Propagate hidden -> output
 					for (c = 0; c < layer1_size; c++)
-						f += neu1[c] * syn1[c + l2];
+						f += neu1[c] * syn1[c + l2]; //sum vectors input window * word weights on syn1 -> output vectors
 
-					if (f <= -MAX_EXP)
+					if (f <= -MAX_EXP) //sigmoid function - precalculated in expTable
 						continue;
 					else if (f >= MAX_EXP)
 						continue;
@@ -614,13 +626,13 @@ void *TrainModelThread(void *id) {
 						f = expTable[(int)((f + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2))];
 
 					// 'g' is the gradient multiplied by the learning rate
-					g = (1 - vocab[word].code[d] - f) * alpha;
+					g = (1 - vocab[word].code[d] - f) * alpha; 
 					// Propagate errors output -> hidden
 					for (c = 0; c < layer1_size; c++)
-						neu1e[c] += g * syn1[c + l2];
+						neu1e[c] += g * syn1[c + l2]; //save to modify vectors
 					// Learn weights hidden -> output
 					for (c = 0; c < layer1_size; c++)
-						syn1[c + l2] += g * neu1[c];
+						syn1[c + l2] += g * neu1[c]; //modify weights
 				}
 			// NEGATIVE SAMPLING
 			if (negative > 0)
@@ -675,7 +687,7 @@ void *TrainModelThread(void *id) {
 					continue;
 
 				for (c = 0; c < layer1_size; c++)
-					syn0[c + last_word * layer1_size] += neu1e[c];
+					syn0[c + last_word * layer1_size] += neu1e[c];  //modify input
 			}
 		} else { 
 				//SKIP-GRAM
@@ -684,6 +696,7 @@ void *TrainModelThread(void *id) {
 				if (a != window) {
 
 					c = sentence_position - window + a;
+
 					if (c < 0)
 						continue;
 					if (c >= sentence_length)
