@@ -66,10 +66,10 @@ void InitUnigramTable() {
 	table = (int *)malloc(table_size * sizeof(int));
 
 	for (a = 0; a < vocab_size; a++)
-		train_words_pow += pow(vocab[a].cn, power);
+		train_words_pow += pow(vocab[a].cn, power); //occurences^power
 
 	i = 0;
-	d1 = pow(vocab[i].cn, power) / (real)train_words_pow;
+	d1 = pow(vocab[i].cn, power) / (real)train_words_pow; //normalize
 
 	for (a = 0; a < table_size; a++) {
 
@@ -99,12 +99,12 @@ void ReadWord(char *word, FILE *fin) {
 			
 			if (a > 0) {
 		    	if (character == '\n')
-		    		ungetc(character, fin);
+		    		ungetc(character, fin); //we don't want the new line char.
 		    break;
 		  	}
 
-		 	if (character == '\n') {
-			    strcpy(word, (char *)"</s>");
+		 	if (character == '\n') { 
+			    strcpy(word, (char *)"</s>");  //newline become </s> in corpus
 			    return;
 		  	}
 		 	else
@@ -117,7 +117,6 @@ void ReadWord(char *word, FILE *fin) {
 		if (a >= MAX_STRING - 1)
 			a--;   // Truncate too long words
 	}
-
 	word[a] = 0;
 }
 
@@ -285,7 +284,7 @@ void CreateBinaryTree() {
 	pos2 = vocab_size; //start of other end
 
 	// Following algorithm constructs the Huffman tree by adding one node at a time
-	for (a = 0; a < vocab_size - 1; a++) {
+	for (a = 0; a < vocab_size - 1; a++) { //vocab is already sorted by frequency
 		// First, find two smallest nodes 'min1, min2'
 		if (pos1 >= 0) {
 
@@ -355,7 +354,7 @@ void LearnVocabFromTrainFile() {
 	FILE *fin;
 	long long a, i;
 
-	for (a = 0; a < vocab_hash_size; a++)
+	for (a = 0; a < vocab_hash_size; a++) //init vocab hashtable
 		vocab_hash[a] = -1;
 
 	fin = fopen(train_file, "rb");
@@ -596,7 +595,6 @@ void *TrainModelThread(void *id) {
 				if (a != window) {
 
 					c = sentence_position - window + a;
-					printf("%d\n",sentence_position );
 					
 					if (c < 0) continue;
 
@@ -687,7 +685,7 @@ void *TrainModelThread(void *id) {
 					continue;
 
 				for (c = 0; c < layer1_size; c++)
-					syn0[c + last_word * layer1_size] += neu1e[c];  //modify input
+					syn0[c + last_word * layer1_size] += neu1e[c];  //modify word vectors
 			}
 		} else { 
 				//SKIP-GRAM
