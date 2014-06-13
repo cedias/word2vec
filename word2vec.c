@@ -32,6 +32,7 @@
 #define MAX_EXP 6
 #define MAX_SENTENCE_LENGTH 1000
 #define MAX_CODE_LENGTH 40
+#define NGRAM 3
 
 const int vocab_hash_size = 30000000;  // Maximum 30 * 0.7 = 21M words in the vocabulary
 
@@ -156,6 +157,10 @@ int ReadWordIndex(FILE *fin) {
 	if (feof(fin)) 
 		return -1;
 
+
+
+
+
 	return SearchVocab(word);
 }
 
@@ -214,7 +219,7 @@ void SortVocab() {
 		}
 		else {
 		// Hash will be re-computed, as after the sorting it is not actual
-			hash=GetWordHash(vocab[a].word);
+			hash = GetWordHash(vocab[a].word);
 
 			while (vocab_hash[hash] != -1)
 				hash = (hash + 1) % vocab_hash_size;
@@ -349,13 +354,29 @@ void CreateBinaryTree() {
 	free(parent_node);
 }
 
+//Look if word already in vocab, if not add, if yes, increment.
+void searchAndAddToVocab(char* word){
+	long long a,i;
+	i = SearchVocab(word);
+
+		if (i == -1) {
+			a = AddWordToVocab(word);
+			vocab[a].cn = 1;
+		} else
+			vocab[i].cn++;
+
+		if (vocab_size > vocab_hash_size * 0.7)
+			ReduceVocab();
+}
+
 void LearnVocabFromTrainFile() {
 	char word[MAX_STRING];
 	FILE *fin;
-	long long a, i;
+	int i,start,end;
+	char* gram;
 
-	for (a = 0; a < vocab_hash_size; a++) //init vocab hashtable
-		vocab_hash[a] = -1;
+	for (i = 0; i < vocab_hash_size; i++) //init vocab hashtable
+		vocab_hash[i] = -1;
 
 	fin = fopen(train_file, "rb");
 
@@ -370,6 +391,26 @@ void LearnVocabFromTrainFile() {
 	while (1) {
 		ReadWord(word, fin);
 
+		if(NGRAM > 0) //learn ngrams instead of words
+		{
+			gram = (char*)calloc(NGRAM,sizeof(char));
+			start = 0;
+			end = NGRAM-1;
+			//printf("word: %s, len: %d\n",word,(int) strlen(word));
+			while(end<strlen(word)){
+				strncpy(gram,word+sizeof(char)*start,NGRAM);
+				//printf("gram: %s\n",gram);
+				searchAndAddToVocab(gram);
+
+				end++;
+				start++;
+			}
+		}
+		else
+		{
+			searchAndAddToVocab(word);
+		}
+
 		if (feof(fin))
 			break;
 
@@ -379,17 +420,6 @@ void LearnVocabFromTrainFile() {
 			printf("%lldK%c", train_words / 1000, 13);
 			fflush(stdout);
 		}
-
-		i = SearchVocab(word);
-
-		if (i == -1) {
-			a = AddWordToVocab(word);
-			vocab[a].cn = 1;
-		} else
-			vocab[i].cn++;
-
-		if (vocab_size > vocab_hash_size * 0.7)
-			ReduceVocab();
 	}
 
 	SortVocab();
@@ -401,6 +431,7 @@ void LearnVocabFromTrainFile() {
 
 	file_size = ftell(fin);
 	fclose(fin);
+	free(gram);
 }
 
 void SaveVocab() {
@@ -508,6 +539,11 @@ void *TrainModelThread(void *id) {
 	real f, g;
 	clock_t now;
 
+	char wordToGram[MAX_STRING];
+	char* gram;
+	int start = 0;
+	int end = NGRAM-1;
+
 	real *neu1 = (real *)calloc(layer1_size, sizeof(real)); //one vector
 	real *neu1e = (real *)calloc(layer1_size, sizeof(real)); 
 	FILE *fi = fopen(train_file, "rb");
@@ -537,8 +573,32 @@ void *TrainModelThread(void *id) {
 		if (sentence_length == 0) {
 
 			while (1) {
-				word = ReadWordIndex(fi);
 
+
+
+				if(NGRAM > 0) //learn ngrams instead of words
+				{
+					
+					if( (start == 0 && end == NGRAM) || (end > strlen(wordToGram)) ){
+						ReadWord(wordToGram, fi);
+						gram = (char*)calloc(NGRAM,sizeof(char));
+						start == 0;
+						end == NGRAM-1;
+					}
+					
+					/// SEGMENTATION FAULT IN THE COUIN
+
+					strncpy(gram,wordToGram+sizeof(char)*start,NGRAM);
+					word = SearchVocab(gram);
+					end++;
+					start++;
+					
+				}
+				else
+				{
+				word = ReadWordIndex(fi); 
+
+				}
 				if (feof(fi))
 					break;
 				if (word == -1)
