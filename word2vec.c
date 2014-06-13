@@ -616,7 +616,7 @@ void *TrainModelThread(void *id) {
 					for (c = 0; c < layer1_size; c++)
 						f += neu1[c] * syn1[c + l2]; //sum vectors input window * word weights on syn1 -> output vectors
 
-					if (f <= -MAX_EXP) //sigmoid function - precalculated in expTable
+					if (f <= -MAX_EXP) //sigmoid activation function - precalculated in expTable
 						continue;
 					else if (f >= MAX_EXP)
 						continue;
@@ -637,27 +637,27 @@ void *TrainModelThread(void *id) {
 				for (d = 0; d < negative + 1; d++) {
 					if (d == 0) {
 						target = word;
-						label = 1;
+						label = 1; //(w,c) in corpus
 					} else {
 						next_random = next_random * (unsigned long long)25214903917 + 11;
 						target = table[(next_random >> 16) % table_size];
 
-						if (target == 0)
+						if (target == 0) 
 							target = next_random % (vocab_size - 1) + 1;
 
 						if (target == word)
 							continue;
 
-						label = 0;
+						label = 0; //(w,c) not in corpus
 					}
 
-					l2 = target * layer1_size;
+					l2 = target * layer1_size; //get word vector index
 					f = 0;
 
 					for (c = 0; c < layer1_size; c++)
-						f += neu1[c] * syn1neg[c + l2];
+						f += neu1[c] * syn1neg[c + l2]; //vector*weights
 
-					if (f > MAX_EXP)
+					if (f > MAX_EXP) //sigmoid
 						g = (label - 1) * alpha;
 					else if (f < -MAX_EXP)
 						g = (label - 0) * alpha;
@@ -665,7 +665,7 @@ void *TrainModelThread(void *id) {
 						g = (label - expTable[(int)((f + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2))]) * alpha;
 
 					for (c = 0; c < layer1_size; c++)
-						neu1e[c] += g * syn1neg[c + l2];
+						neu1e[c] += g * syn1neg[c + l2]; //saving error
 
 					for (c = 0; c < layer1_size; c++)
 						syn1neg[c + l2] += g * neu1[c];
@@ -685,7 +685,7 @@ void *TrainModelThread(void *id) {
 					continue;
 
 				for (c = 0; c < layer1_size; c++)
-					syn0[c + last_word * layer1_size] += neu1e[c];  //modify word vectors
+					syn0[c + last_word * layer1_size] += neu1e[c];  //modify word vectors with error
 			}
 		} else { 
 				//SKIP-GRAM
@@ -705,7 +705,7 @@ void *TrainModelThread(void *id) {
 					if (last_word == -1)
 						continue;
 
-					l1 = last_word * layer1_size;
+					l1 = last_word * layer1_size; //word index
 
 					for (c = 0; c < layer1_size; c++)
 						neu1e[c] = 0;
@@ -714,7 +714,7 @@ void *TrainModelThread(void *id) {
 					if (hs)
 						for (d = 0; d < vocab[word].codelen; d++) {
 							f = 0;
-							l2 = vocab[word].point[d] * layer1_size;
+							l2 = vocab[word].point[d] * layer1_size; //other words
 							// Propagate hidden -> output
 							for (c = 0; c < layer1_size; c++)
 								f += syn0[c + l1] * syn1[c + l2];
@@ -896,8 +896,15 @@ void TrainModel() {
 			}
 		}
 		// Save the K-means classes
-		for (a = 0; a < vocab_size; a++)
-			fprintf(fo, "%s %d\n", vocab[a].word, cl[a]);
+
+		for (a = 0; a < vocab_size; a++){
+			fprintf(fo, "%s %d", vocab[a].word, cl[a]);
+
+			for (b = 0; b < layer1_size; b++){
+				fprintf(fo, "%lf ", syn0[a * layer1_size + b]);
+			}
+			fprintf(fo, "\n");
+		}
 
 		free(centcn);
 		free(cent);
@@ -987,6 +994,7 @@ int main(int argc, char **argv) {
 	if ((i = ArgPos((char *)"-threads", argc, argv)) > 0) num_threads = atoi(argv[i + 1]);
 	if ((i = ArgPos((char *)"-min-count", argc, argv)) > 0) min_count = atoi(argv[i + 1]);
 	if ((i = ArgPos((char *)"-classes", argc, argv)) > 0) classes = atoi(argv[i + 1]);
+	
 
 	vocab = (struct vocab_word *)calloc(vocab_max_size, sizeof(struct vocab_word));
 	vocab_hash = (int *)calloc(vocab_hash_size, sizeof(int));
