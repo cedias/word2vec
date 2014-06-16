@@ -543,6 +543,9 @@ void *TrainModelThread(void *id) {
 	char* gram;
 	int start = 0;
 	int end = NGRAM-1;
+	gram = (char*)calloc(NGRAM,sizeof(char));
+	int newWord = 1;
+	int wordLength = 0;
 
 	real *neu1 = (real *)calloc(layer1_size, sizeof(real)); //one vector
 	real *neu1e = (real *)calloc(layer1_size, sizeof(real)); 
@@ -579,19 +582,32 @@ void *TrainModelThread(void *id) {
 				if(NGRAM > 0) //learn ngrams instead of words
 				{
 					
-					if( (start == 0 && end == NGRAM) || (end > strlen(wordToGram)) ){
+					
+					if(newWord){
 						ReadWord(wordToGram, fi);
-						gram = (char*)calloc(NGRAM,sizeof(char));
-						start == 0;
-						end == NGRAM-1;
+						start = 0;
+						end = NGRAM-1;
+						wordLength = strlen(wordToGram);
+					//	printf("new word: %s, length:%d\n",wordToGram,wordLength);
+						newWord = 0;
 					}
 					
-					/// SEGMENTATION FAULT IN THE COUIN
 
+					if(wordLength <= NGRAM){
+						word =  SearchVocab(wordToGram);
+						newWord = 1;
+						continue;
+					}
+
+					
 					strncpy(gram,wordToGram+sizeof(char)*start,NGRAM);
 					word = SearchVocab(gram);
+					//printf("word: %s, gram: %s,index:%lld, start: %d, end %d \n",wordToGram,gram,word,start,end);
 					end++;
 					start++;
+
+					if(end == wordLength)
+						newWord = 1;
 					
 				}
 				else
@@ -599,6 +615,8 @@ void *TrainModelThread(void *id) {
 				word = ReadWordIndex(fi); 
 
 				}
+				
+
 				if (feof(fi))
 					break;
 				if (word == -1)
@@ -623,7 +641,7 @@ void *TrainModelThread(void *id) {
 				if (sentence_length >= MAX_SENTENCE_LENGTH)
 					break;
 			}
-
+			
 			sentence_position = 0;
 		}
 
