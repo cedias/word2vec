@@ -90,6 +90,11 @@ void InitUnigramTable() {
 // Reads a single word from a file, assuming space + tab + EOL to be word boundaries
 void ReadWord(char *word, FILE *fin) {
 	int a = 0, character;
+	
+	if(HASHBANG){
+		word[a] = '#'; //words starts with #
+		a++;
+	}
 
 	while (!feof(fin)) {
 		character = fgetc(fin);
@@ -119,6 +124,12 @@ void ReadWord(char *word, FILE *fin) {
 		if (a >= MAX_STRING - 1)
 			a--;   // Truncate too long words
 	}
+
+	if(HASHBANG){
+		word[a] = '#'; //words ends with #
+		a++;
+	}
+
 	word[a] = 0;
 }
 
@@ -373,7 +384,7 @@ void searchAndAddToVocab(char* word){
 void LearnVocabFromTrainFile() {
 	char word[MAX_STRING];
 	FILE *fin;
-	int i,start,end;
+	int i,start,end,lenWord;
 	char* gram;
 
 	for (i = 0; i < vocab_hash_size; i++) //init vocab hashtable
@@ -394,11 +405,14 @@ void LearnVocabFromTrainFile() {
 
 		if(NGRAM > 0) //learn ngrams instead of words
 		{
+			lenWord = strlen(word);
+
 			gram = (char*)calloc(NGRAM,sizeof(char)); //leak 
  			start = 0;
 			end = NGRAM-1;
 			//printf("word: %s, len: %d\n",word,(int) strlen(word));
-			while(end<strlen(word)){
+			while(end<lenWord)
+			{
 				strncpy(gram,word+sizeof(char)*start,NGRAM);
 				//printf("gram: %s\n",gram);
 				searchAndAddToVocab(gram);
@@ -545,7 +559,7 @@ void *TrainModelThread(void *id) {
 	int start = 0;
 	int end = NGRAM-1;
 	gram = (char*)calloc(NGRAM,sizeof(char));
-	gramBang = (char*)calloc(NGRAM,sizeof(char)+2); // w/ hashbang i.e: #good# -> #go goo ood od#
+	//gramBang = (char*)calloc(NGRAM,sizeof(char)+2); // w/ hashbang i.e: #good# -> #go goo ood od#
 	int newWord = 1;
 	int wordLength = 0;
 
@@ -556,6 +570,7 @@ void *TrainModelThread(void *id) {
 	fseek(fi, file_size / (long long)num_threads * (long long)id, SEEK_SET);
 
 	while (1) {
+
 
 		if (word_count - last_word_count > 10000) {
 			word_count_actual += word_count - last_word_count;
@@ -578,8 +593,11 @@ void *TrainModelThread(void *id) {
 		if (sentence_length == 0) {
 
 			while (1) {
+				
 
-
+				if (feof(fi))
+					break;
+				
 
 				if(NGRAM > 0) //learn ngrams instead of words
 				{
@@ -619,8 +637,6 @@ void *TrainModelThread(void *id) {
 				}
 				
 
-				if (feof(fi))
-					break;
 				if (word == -1)
 					continue;
 
@@ -902,6 +918,8 @@ void TrainModel() {
 
 	for (a = 0; a < num_threads; a++)
 		pthread_join(pt[a], NULL);
+
+	printf("Training Ended !\n");
 
 	fo = fopen(output_file, "wb");
 
