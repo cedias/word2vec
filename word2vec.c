@@ -33,6 +33,7 @@
 #define MAX_SENTENCE_LENGTH 1000
 #define MAX_CODE_LENGTH 40
 #define NGRAM 3
+#define HASHBANG 1
 
 const int vocab_hash_size = 30000000;  // Maximum 30 * 0.7 = 21M words in the vocabulary
 
@@ -47,7 +48,7 @@ struct vocab_word {
 char train_file[MAX_STRING], output_file[MAX_STRING];
 char save_vocab_file[MAX_STRING], read_vocab_file[MAX_STRING];
 struct vocab_word *vocab;
-int binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 5, num_threads = 1, min_reduce = 1;
+int binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 5, num_threads = 1, min_reduce = 1, ngram = 0, hashbang = 0;
 int *vocab_hash;
 long long vocab_max_size = 1000, vocab_size = 0, layer1_size = 100;
 long long train_words = 0, word_count_actual = 0, file_size = 0, classes = 0;
@@ -393,8 +394,8 @@ void LearnVocabFromTrainFile() {
 
 		if(NGRAM > 0) //learn ngrams instead of words
 		{
-			gram = (char*)calloc(NGRAM,sizeof(char));
-			start = 0;
+			gram = (char*)calloc(NGRAM,sizeof(char)); //leak 
+ 			start = 0;
 			end = NGRAM-1;
 			//printf("word: %s, len: %d\n",word,(int) strlen(word));
 			while(end<strlen(word)){
@@ -544,6 +545,7 @@ void *TrainModelThread(void *id) {
 	int start = 0;
 	int end = NGRAM-1;
 	gram = (char*)calloc(NGRAM,sizeof(char));
+	gramBang = (char*)calloc(NGRAM,sizeof(char)+2); // w/ hashbang i.e: #good# -> #go goo ood od#
 	int newWord = 1;
 	int wordLength = 0;
 
@@ -1047,6 +1049,10 @@ int main(int argc, char **argv) {
 		printf("\t\tThe vocabulary will be read from <file>, not constructed from the training data\n");
 		printf("\t-cbow <int>\n");
 		printf("\t\tUse the continuous bag of words model; default is 0 (skip-gram model)\n");
+		printf("\t\tUse N-GRAM model instead of words to train vectors \n");
+		printf("\t-ngram <int> (default 0 - use words) \n");
+		printf("\t\tUse hashbang on n-grams - i.e #good# -> #go,goo,ood,od#\n");
+		printf("\t-wordhash <0-1> (default 0)\n");
 		printf("\nExamples:\n");
 		printf("./word2vec -train data.txt -output vec.txt -debug 2 -size 200 -window 5 -sample 1e-4 -negative 5 -hs 0 -binary 0 -cbow 1\n\n");
 		return 0;
@@ -1072,6 +1078,8 @@ int main(int argc, char **argv) {
 	if ((i = ArgPos((char *)"-threads", argc, argv)) > 0) num_threads = atoi(argv[i + 1]);
 	if ((i = ArgPos((char *)"-min-count", argc, argv)) > 0) min_count = atoi(argv[i + 1]);
 	if ((i = ArgPos((char *)"-classes", argc, argv)) > 0) classes = atoi(argv[i + 1]);
+	//if ((i = ArgPos ((char *) "-ngram", argc, argv)) > 0 ) ngram = atoi(argv[i + 1])
+	//if ((i = ArgPos ((char *) "-wordhash", argc, argv)) > 0 ) wordhash = atoi(argv[i + 1])
 	
 
 	vocab = (struct vocab_word *)calloc(vocab_max_size, sizeof(struct vocab_word));
