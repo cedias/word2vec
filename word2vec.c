@@ -32,8 +32,7 @@
 #define MAX_EXP 6
 #define MAX_SENTENCE_LENGTH 1000
 #define MAX_CODE_LENGTH 40
-#define NGRAM 3
-#define HASHBANG 1
+
 
 const int vocab_hash_size = 30000000;  // Maximum 30 * 0.7 = 21M words in the vocabulary
 
@@ -91,7 +90,7 @@ void InitUnigramTable() {
 void ReadWord(char *word, FILE *fin) {
 	int a = 0, character;
 	
-	if(HASHBANG){
+	if(hashbang > 0){
 		word[a] = '#'; //words starts with #
 		a++;
 	}
@@ -125,7 +124,7 @@ void ReadWord(char *word, FILE *fin) {
 			a--;   // Truncate too long words
 	}
 
-	if(HASHBANG){
+	if(hashbang>0){
 		word[a] = '#'; //words ends with #
 		a++;
 	}
@@ -385,7 +384,7 @@ void LearnVocabFromTrainFile() {
 	char word[MAX_STRING];
 	FILE *fin;
 	int i,start,end,lenWord;
-	char* gram;
+	char* gram = (char*)calloc(ngram,sizeof(char));
 
 	for (i = 0; i < vocab_hash_size; i++) //init vocab hashtable
 		vocab_hash[i] = -1;
@@ -403,17 +402,16 @@ void LearnVocabFromTrainFile() {
 	while (1) {
 		ReadWord(word, fin);
 
-		if(NGRAM > 0) //learn ngrams instead of words
+		if(ngram > 0) //learn ngrams instead of words
 		{
 			lenWord = strlen(word);
 
-			gram = (char*)calloc(NGRAM,sizeof(char)); //leak 
  			start = 0;
-			end = NGRAM-1;
+			end = ngram-1;
 			//printf("word: %s, len: %d\n",word,(int) strlen(word));
 			while(end<lenWord)
 			{
-				strncpy(gram,word+sizeof(char)*start,NGRAM);
+				strncpy(gram,word+sizeof(char)*start,ngram);
 				//printf("gram: %s\n",gram);
 				searchAndAddToVocab(gram);
 
@@ -557,9 +555,8 @@ void *TrainModelThread(void *id) {
 	char wordToGram[MAX_STRING];
 	char* gram;
 	int start = 0;
-	int end = NGRAM-1;
-	gram = (char*)calloc(NGRAM,sizeof(char));
-	//gramBang = (char*)calloc(NGRAM,sizeof(char)+2); // w/ hashbang i.e: #good# -> #go goo ood od#
+	int end = ngram-1;
+	gram = (char*)calloc(ngram,sizeof(char));
 	int newWord = 1;
 	int wordLength = 0;
 
@@ -599,28 +596,28 @@ void *TrainModelThread(void *id) {
 					break;
 				
 
-				if(NGRAM > 0) //learn ngrams instead of words
+				if(ngram > 0) //learn ngrams instead of words
 				{
 					
 					
 					if(newWord){
 						ReadWord(wordToGram, fi);
 						start = 0;
-						end = NGRAM-1;
+						end = ngram-1;
 						wordLength = strlen(wordToGram);
 					//	printf("new word: %s, length:%d\n",wordToGram,wordLength);
 						newWord = 0;
 					}
 					
 
-					if(wordLength <= NGRAM){
+					if(wordLength <= ngram){
 						word =  SearchVocab(wordToGram);
 						newWord = 1;
 						continue;
 					}
 
 					
-					strncpy(gram,wordToGram+sizeof(char)*start,NGRAM);
+					strncpy(gram,wordToGram+sizeof(char)*start,ngram);
 					word = SearchVocab(gram);
 					//printf("word: %s, gram: %s,index:%lld, start: %d, end %d \n",wordToGram,gram,word,start,end);
 					end++;
@@ -1067,10 +1064,10 @@ int main(int argc, char **argv) {
 		printf("\t\tThe vocabulary will be read from <file>, not constructed from the training data\n");
 		printf("\t-cbow <int>\n");
 		printf("\t\tUse the continuous bag of words model; default is 0 (skip-gram model)\n");
-		printf("\t\tUse N-GRAM model instead of words to train vectors \n");
 		printf("\t-ngram <int> (default 0 - use words) \n");
+		printf("\t\tUse N-GRAM model instead of words to train vectors \n");
+		printf("\t-hashbang <0-1> (default 0)\n");
 		printf("\t\tUse hashbang on n-grams - i.e #good# -> #go,goo,ood,od#\n");
-		printf("\t-wordhash <0-1> (default 0)\n");
 		printf("\nExamples:\n");
 		printf("./word2vec -train data.txt -output vec.txt -debug 2 -size 200 -window 5 -sample 1e-4 -negative 5 -hs 0 -binary 0 -cbow 1\n\n");
 		return 0;
@@ -1096,8 +1093,8 @@ int main(int argc, char **argv) {
 	if ((i = ArgPos((char *)"-threads", argc, argv)) > 0) num_threads = atoi(argv[i + 1]);
 	if ((i = ArgPos((char *)"-min-count", argc, argv)) > 0) min_count = atoi(argv[i + 1]);
 	if ((i = ArgPos((char *)"-classes", argc, argv)) > 0) classes = atoi(argv[i + 1]);
-	//if ((i = ArgPos ((char *) "-ngram", argc, argv)) > 0 ) ngram = atoi(argv[i + 1])
-	//if ((i = ArgPos ((char *) "-wordhash", argc, argv)) > 0 ) wordhash = atoi(argv[i + 1])
+	if ((i = ArgPos ((char *) "-ngram", argc, argv)) > 0 ) ngram = atoi(argv[i + 1]);
+	if ((i = ArgPos ((char *) "-hashbang", argc, argv)) > 0 ) hashbang = atoi(argv[i + 1]);
 	
 
 	vocab = (struct vocab_word *)calloc(vocab_max_size, sizeof(struct vocab_word));
