@@ -181,9 +181,11 @@ int AddWordToVocab(char *word) {
 
 	if (length > MAX_STRING)
 		length = MAX_STRING;
-
+	printf("hello\n");
 	vocab[vocab_size].word = (char *)calloc(length, sizeof(char));
+	printf("bye12\n");
 	strcpy(vocab[vocab_size].word, word);
+	printf("bye1\n");
 	vocab[vocab_size].cn = 0;
 	vocab_size++;
 
@@ -192,7 +194,6 @@ int AddWordToVocab(char *word) {
 		vocab_max_size += 1000;
 		vocab = (struct vocab_word *)realloc(vocab, vocab_max_size * sizeof(struct vocab_word));
 	}
-
 	hash = GetWordHash(word);
 
 	while (vocab_hash[hash] != -1)
@@ -1009,6 +1010,94 @@ void TrainModel() {
 	fclose(fo);
 }
 
+
+void createWordVectorFile(){
+
+	char word[MAX_STRING];
+	FILE *fin, *fo;
+	int i,start,end,lenWord,indGram, offset;
+	char* gram = (char*)calloc(ngram,sizeof(char));
+	real wordVec[layer1_size];
+
+	fin = fopen(train_file, "rb");
+	fo = fopen(output_file, "wb");
+
+	if (fin == NULL) {
+		printf("ERROR: training data file not found!\n");
+		exit(1);
+	}
+ 	
+ 	fprintf(fo, "%lld %lld\n", vocab_size, layer1_size);
+
+ 	/*write </s>
+ 	if (binary)
+			for (i = 0; i < layer1_size; i++)
+				fwrite(&word2vec[i], sizeof(real), 1, fo);
+		else
+			for (i = 0; i < layer1_size; i++)
+				fprintf(fo, "%lf ", wordVec[i]);
+	*/
+	while (1) {
+		printf("new iter\n");
+		if (feof(fin))
+			break;
+
+		ReadWord(word, fin);
+
+		for(i=0;i<layer1_size;i++) //init word vec
+			wordVec[i] = 0;
+
+		lenWord = strlen(word);
+		start = 0;
+		end = ngram-1;
+		printf("new word: %s\n",word );
+		if(SearchVocab(word) != -1)
+			continue;
+
+		printf("word: %s, len: %d\n",word,(int) strlen(word));
+		while(end<lenWord)
+		{
+			strncpy(gram,word+sizeof(char)*start,ngram);
+			printf("gram: %s\n",gram);
+
+			indGram = SearchVocab(gram);
+
+			if(indGram > -1)
+				offset = indGram * layer1_size;
+			else
+			{
+				end++;
+				start++;
+				continue;
+			}
+			
+
+			for(i=0;i<layer1_size;i++){
+				wordVec[i] = syn0[offset+i];
+			}
+
+			end++;
+			start++;
+		}
+
+		fprintf(fo, "%s ", word);
+		for (i = 0; i < layer1_size; i++){
+			printf("num: %d, val:%lf\n",i,wordVec[i] );
+			if (binary)
+					fwrite(&wordVec[i], sizeof(real), 1, fo);
+			else
+					fprintf(fo, "%lf ", wordVec[i]);
+		}
+		printf("before\n");
+		AddWordToVocab(word);
+		printf("after\n");
+		fprintf(fo, "\n");
+	}
+	printf("Fin\n");
+	fclose(fo);
+	fclose(fin);
+}
+
 int ArgPos(char *str, int argc, char **argv) {
 	int a;
 	for (a = 1; a < argc; a++)
@@ -1107,5 +1196,8 @@ int main(int argc, char **argv) {
 	}
 	
 	TrainModel();
+
+	if(ngram > 0)
+		createWordVectorFile();
 	return 0;
 }
