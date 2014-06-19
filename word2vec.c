@@ -109,6 +109,7 @@ void ReadWord(char *word, FILE *fin) {
 
 		 	if (character == '\n') { 
 			    strcpy(word, (char *)"</s>");  //newline become </s> in corpus
+			    printf("READ newline\n");
 			    return;
 		  	}
 		 	else
@@ -257,6 +258,9 @@ void SortVocab() {
 	int a, size;
 	unsigned int hash;
 
+	if(debug_mode > 2)
+		printf("Sorting Vocab...\n");
+
 	// Sort the vocabulary and keep </s> at the first position
 	qsort(&vocab[1], vocab_size - 1, sizeof(struct vocab_word), VocabCompare);
 
@@ -294,6 +298,9 @@ void SortVocab() {
 		vocab[a].code = (char *)calloc(MAX_CODE_LENGTH, sizeof(char));
 		vocab[a].point = (int *)calloc(MAX_CODE_LENGTH, sizeof(int));
 	}
+
+	printf("Sorting ended !\n");
+
 }
 
 // Reduces the vocabulary by removing infrequent tokens
@@ -1095,7 +1102,9 @@ void createWordVectorFile(){
 	int i,start,end,lenWord,indGram, offset;
 	int *hashset;
 	long long unsigned int cptWord=0;
-
+	int skipCpt=0;
+	int unexistCpt=0;
+	int gramCpt=0;
 
 	
 	
@@ -1132,12 +1141,27 @@ void createWordVectorFile(){
 	fprintf(fo, "%lld %lld\n", cptWord, layer1_size); //prints size
 	printf("number of words: %lld\n",cptWord );
 
- 	/*write </s> missing */
+ 	
 
 	/*reset*/
 	rewind(fin);
 	for(i=0;i<vocab_hash_size;i++)
 		hashset[i] = -1;
+	cptWord=0;
+
+	/*write </s>*/
+	indGram = SearchVocab("</s>");
+	offset = indGram * layer1_size;
+	fprintf(fo, "</s> ");
+	for (i = 0; i < layer1_size; i++){
+		if (binary)
+			fwrite(&wordVec[i], sizeof(real), 1, fo);
+		else
+			fprintf(fo, "%lf ", wordVec[i]);
+	}
+	fprintf(fo, "\n");
+
+
 		
 	while (1) {
 		
@@ -1147,7 +1171,7 @@ void createWordVectorFile(){
 		ReadWord(word, fin);
 
 		hash = GetWordHash(word);
-		for(i=0;i<layer1_size;i++) //init word vec
+		for(i=0;i<layer1_size;i++) 
 			wordVec[i] = 0;
 
 		lenWord = strlen(word);
@@ -1155,13 +1179,12 @@ void createWordVectorFile(){
 		end = ngram-1;
 
 		if(hashset[hash] != -1){
+			skipCpt++;
 			continue;
 		}
 
-		//printf("word: %s\n",word );
 		while(end<lenWord)
 		{
-
 
 			for (i = 0; i < ngram; i++)
 			{
@@ -1169,7 +1192,7 @@ void createWordVectorFile(){
 			}
 			grama[ngram] = '\0';
 
-			//strncpy(gram,word+(sizeof(char)*start),ngram);
+			
 			
 
 			indGram = SearchVocab(grama);
@@ -1178,6 +1201,7 @@ void createWordVectorFile(){
 				offset = indGram * layer1_size;
 			else
 			{
+				unexistCpt++;
 				end++;
 				start++;
 				continue;
@@ -1185,11 +1209,17 @@ void createWordVectorFile(){
 			
 			//printf("gram: %s\n",grama );
 			for(i=0;i<layer1_size;i++){
-				wordVec[i] = syn0[offset+i];
+				wordVec[i] += syn0[offset+i];
 			}
+			gramCpt++;
 
 			end++;
 			start++;
+		}
+
+		//normalization
+		for(i=0;i<layer1_size;i++){
+				wordVec[i] /= gramCpt;
 		}
 
 		hashset[hash] = 1;
@@ -1216,6 +1246,7 @@ void createWordVectorFile(){
 		
 	}
 	
+	printf("Saved %lld word vectors, %d grams weren't in dictionnary, %d words were skipped (doubles)\n",cptWord,unexistCpt,skipCpt);
 	
 	fclose(fo);
 	fclose(fin);
