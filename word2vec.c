@@ -90,13 +90,10 @@ void InitUnigramTable() {
 void ReadWord(char *word, FILE *fin) {
 	int a = 0, character;
 	
-	if(hashbang > 0){
-		word[a] = '#'; //words starts with #
-		a++;
-	}
-
 	while (!feof(fin)) {
 		character = fgetc(fin);
+
+
 
 		if (character == 13) //Carriage Return
 			continue;
@@ -104,6 +101,7 @@ void ReadWord(char *word, FILE *fin) {
 		if ((character == ' ') || (character == '\t') || (character == '\n')) {
 			
 			if (a > 0) {
+
 		    	if (character == '\n')
 		    		ungetc(character, fin); //we don't want the new line char.
 		    break;
@@ -124,12 +122,29 @@ void ReadWord(char *word, FILE *fin) {
 			a--;   // Truncate too long words
 	}
 
-	if(hashbang>0){
-		word[a] = '#'; //words ends with #
+	word[a] = '\0';
+
+	if(hashbang > 0)
+	{
+
+		a = strlen(word); //'\0'
+		word[a] = '#';
 		a++;
+		word[a] = '\0';
+		a++;
+
+
+ 		while(a>0)
+ 		{
+ 			word[a] = word[a-1];
+ 			a--;
+ 		}
+
+ 		word[0] ='#';
 	}
 
-	word[a] = '\0';
+
+	return;
 }
 
 // Returns hash value of a word
@@ -421,7 +436,7 @@ void LearnVocabFromTrainFile() {
 	FILE *fin;
 	int i,start,end,lenWord;
 
-	char* gram = (char*)calloc(ngram,sizeof(char)); //"\0"
+	char gram[ngram+1];
 
 	for (i = 0; i < vocab_hash_size; i++) //init vocab hashtable
 		vocab_hash[i] = -1;
@@ -443,18 +458,29 @@ void LearnVocabFromTrainFile() {
 		{
 			lenWord = strlen(word);
 
-			if(lenWord<ngram){
+			if(lenWord<=ngram){ //word smaller or equal to ngram var.
 				searchAndAddToVocab(word);
 				continue;
 			}
 
  			start = 0;
 			end = ngram-1;
-			//printf("word: %s, len: %d\n",word,(int) strlen(word));
+			i=0;
+
+		
+
 			while(end<lenWord)
 			{
-				strncpy(gram,word+sizeof(char)*start,ngram);
-			//	printf("gram: %s\n",gram);
+
+				for (i = 0; i < ngram; i++)
+				{
+					gram[i] = word[start+i];
+				}
+				gram[ngram] = '\0';
+
+
+				
+
 				searchAndAddToVocab(gram);
 
 				end++;
@@ -486,7 +512,6 @@ void LearnVocabFromTrainFile() {
 
 	file_size = ftell(fin);
 	fclose(fin);
-	free(gram);
 }
 
 void SaveVocab() {
@@ -587,7 +612,7 @@ void InitNet() {
 }
 
 void *TrainModelThread(void *id) {
-	long long a, b, d, word, last_word, sentence_length = 0, sentence_position = 0;
+	long long a, b, d, i, word, last_word, sentence_length = 0, sentence_position = 0;
 	long long word_count = 0, last_word_count = 0, sen[MAX_SENTENCE_LENGTH + 1];
 	long long l1, l2, c, target, label;
 	unsigned long long next_random = (long long)id;
@@ -595,10 +620,9 @@ void *TrainModelThread(void *id) {
 	clock_t now;
 
 	char wordToGram[MAX_STRING];
-	char* gram;
+	char gram[ngram+1];
 	int start = 0;
 	int end = ngram-1;
-	gram = (char*)calloc(ngram,sizeof(char));
 	int newWord = 1;
 	int wordLength = 0;
 
@@ -647,7 +671,7 @@ void *TrainModelThread(void *id) {
 						start = 0;
 						end = ngram-1;
 						wordLength = strlen(wordToGram);
-					//	printf("new word: %s, length:%d\n",wordToGram,wordLength);
+					
 						newWord = 0;
 					}
 					
@@ -659,9 +683,15 @@ void *TrainModelThread(void *id) {
 					}
 
 					
-					strncpy(gram,wordToGram+sizeof(char)*start,ngram);
+					for (i = 0; i < ngram; i++)
+					{
+						gram[i] = wordToGram[start+i];
+					}
+					gram[ngram] = '\0';
+
+
 					word = SearchVocab(gram);
-					//printf("word: %s, gram: %s,index:%lld, start: %d, end %d \n",wordToGram,gram,word,start,end);
+					
 					end++;
 					start++;
 
@@ -1058,14 +1088,19 @@ void TrainModel() {
 
 
 void createWordVectorFile(){
-	int hashset[vocab_hash_size];
+	char grama[ngram+1];
 	int hash =0;
 	char word[MAX_STRING];
 	FILE *fin, *fo;
 	int i,start,end,lenWord,indGram, offset;
+	int *hashset;
+	long long unsigned int cptWord=0;
 
-	char gram[ngram+1];
 
+	
+	
+
+	hashset = calloc(vocab_hash_size,sizeof(int));
 	real wordVec[layer1_size];
 
 	for(i=0;i<vocab_hash_size;i++)
@@ -1078,23 +1113,39 @@ void createWordVectorFile(){
 		printf("ERROR: training data file not found!\n");
 		exit(1);
 	}
- 	
- 	fprintf(fo, "%lld %lld\n", vocab_size, layer1_size); //prints size
 
- 	/*write </s>
- 	if (binary)
-			for (i = 0; i < layer1_size; i++)
-				fwrite(&word2vec[i], sizeof(real), 1, fo);
-		else
-			for (i = 0; i < layer1_size; i++)
-				fprintf(fo, "%lf ", wordVec[i]);
-	*/
 	while (1) {
-		//printf("new iter\n");
+		
 		if (feof(fin))
 			break;
 
 		ReadWord(word, fin);
+		hash = GetWordHash(word);
+
+		if (hashset[hash] != -1)
+			continue;
+		else
+			hashset[hash] = 1;
+		cptWord++;
+	}
+
+	fprintf(fo, "%lld %lld\n", cptWord, layer1_size); //prints size
+	printf("number of words: %lld\n",cptWord );
+
+ 	/*write </s> missing */
+
+	/*reset*/
+	rewind(fin);
+	for(i=0;i<vocab_hash_size;i++)
+		hashset[i] = -1;
+		
+	while (1) {
+		
+		if (feof(fin))
+			break;
+
+		ReadWord(word, fin);
+
 		hash = GetWordHash(word);
 		for(i=0;i<layer1_size;i++) //init word vec
 			wordVec[i] = 0;
@@ -1107,13 +1158,21 @@ void createWordVectorFile(){
 			continue;
 		}
 
-		printf("word: %s\n",word );
+		//printf("word: %s\n",word );
 		while(end<lenWord)
 		{
-			strncpy(gram,word+(sizeof(char)*start),ngram);
+
+
+			for (i = 0; i < ngram; i++)
+			{
+				grama[i] = word[start+i];
+			}
+			grama[ngram] = '\0';
+
+			//strncpy(gram,word+(sizeof(char)*start),ngram);
 			
 
-			indGram = SearchVocab(gram);
+			indGram = SearchVocab(grama);
 
 			if(indGram > -1)
 				offset = indGram * layer1_size;
@@ -1124,7 +1183,7 @@ void createWordVectorFile(){
 				continue;
 			}
 			
-			printf("gram: %s\n",gram );
+			//printf("gram: %s\n",grama );
 			for(i=0;i<layer1_size;i++){
 				wordVec[i] = syn0[offset+i];
 			}
@@ -1133,6 +1192,18 @@ void createWordVectorFile(){
 			start++;
 		}
 
+		hashset[hash] = 1;
+		cptWord++;
+
+
+
+		//removes #bangs
+		for(i=1;i<lenWord;i++){
+			word[i-1]=word[i];
+		}
+		word[lenWord-2]='\0';
+
+
 		fprintf(fo, "%s ", word);
 		for (i = 0; i < layer1_size; i++){
 			if (binary)
@@ -1140,9 +1211,12 @@ void createWordVectorFile(){
 			else
 					fprintf(fo, "%lf ", wordVec[i]);
 		}
-		hashset[hash] = 1;
+		
 		fprintf(fo, "\n");
+		
 	}
+	
+	
 	fclose(fo);
 	fclose(fin);
 }
