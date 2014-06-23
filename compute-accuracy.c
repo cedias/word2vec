@@ -26,15 +26,15 @@ const long long max_w = 50;              // max length of vocabulary entries
 int main(int argc, char **argv)
 {
   FILE *f;
-  char st1[max_size], st2[max_size], st3[max_size], st4[max_size], bestw[N][max_size], file_name[max_size], ch;
+  char st1[max_size], st2[max_size], st3[max_size], st4[max_size], bestw[N][max_size], file_name[max_size],output_file[max_size], ch;
   float dist, len, bestd[N], vec[max_size];
   long long words, size, a, b, c, d, b1, b2, b3, threshold = 0;
   float *M;
   char *vocab;
   int TCN, CCN = 0, TACN = 0, CACN = 0, SECN = 0, SYCN = 0, SEAC = 0, SYAC = 0, QID = 0, TQ = 0, TQS = 0;
-
+  int small_print =0;
   if (argc < 2) {
-    printf("Usage: ./compute-accuracy <FILE> <threshold>\nwhere FILE contains word projections, and threshold is used to reduce vocabulary of the model for fast approximate evaluation (0 = off, otherwise typical value is 30000)\n");
+    printf("Usage: ./compute-accuracy <FILE> <threshold> <small_print>\nwhere FILE contains word projections, and threshold is used to reduce vocabulary of the model for fast approximate evaluation (0 = off, otherwise typical value is 30000)\n");
     return 0;
   }
 
@@ -42,6 +42,9 @@ int main(int argc, char **argv)
 
   if (argc > 2)
     threshold = atoi(argv[2]);
+
+  if (argc > 3)
+    small_print = 1; //output is smaller
 
   f = fopen(file_name, "rb");
 
@@ -91,7 +94,8 @@ int main(int argc, char **argv)
   fclose(f);
 
   TCN = 0;
-
+  if(small_print)
+    printf("Type\tAccuracy(top1)%%\tTotal Acc%%\tSemantic Acc%%\tSyntactic Acc%%\tSuccess\tTotal\n");
   while (1) {
 
     for (a = 0; a < N; a++)
@@ -111,8 +115,12 @@ int main(int argc, char **argv)
         TCN = 1;
 
       if (QID != 0) {
-        printf("ACCURACY TOP1: %.2f %%  (%d / %d)\n", CCN / (float)TCN * 100, CCN, TCN);
-        printf("Total accuracy: %.2f %%   Semantic accuracy: %.2f %%   Syntactic accuracy: %.2f %% \n", CACN / (float)TACN * 100, SEAC / (float)SECN * 100, SYAC / (float)SYCN * 100);
+        if(small_print){
+          printf("%.2f\t%.2f\t%.2f\t%.2f\t%d\t%d\n", CCN / (float)TCN * 100,CACN / (float)TACN * 100, SEAC / (float)SECN * 100, SYAC / (float)SYCN * 100, CCN, TCN);
+        }else{
+          printf("ACCURACY TOP1: %.2f %%  (%d / %d)\n", CCN / (float)TCN * 100, CCN, TCN);
+          printf("Total accuracy: %.2f %%   Semantic accuracy: %.2f %%   Syntactic accuracy: %.2f %% \n", CACN / (float)TACN * 100, SEAC / (float)SECN * 100, SYAC / (float)SYCN * 100);
+        }
       }
 
       QID++;
@@ -121,7 +129,11 @@ int main(int argc, char **argv)
       if (feof(stdin))
         break;
 
-      printf("%s:\n", st1);
+      if(small_print)
+        printf("%s\t", st1);
+      else
+        printf("%s:\n", st1);
+
       TCN = 0;
       CCN = 0;
       continue;

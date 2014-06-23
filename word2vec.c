@@ -109,7 +109,6 @@ void ReadWord(char *word, FILE *fin) {
 
 		 	if (character == '\n') { 
 			    strcpy(word, (char *)"</s>");  //newline become </s> in corpus
-			    printf("READ newline\n");
 			    return;
 		  	}
 		 	else
@@ -299,8 +298,6 @@ void SortVocab() {
 		vocab[a].point = (int *)calloc(MAX_CODE_LENGTH, sizeof(int));
 	}
 
-	printf("Sorting ended !\n");
-
 }
 
 // Reduces the vocabulary by removing infrequent tokens
@@ -467,13 +464,18 @@ void LearnVocabFromTrainFile() {
 
 			if(lenWord<=ngram){ //word smaller or equal to ngram var.
 				searchAndAddToVocab(word);
-				continue;
+				//printf("smaller\n");
+
+				if (feof(fin))
+					break;
+				else
+					continue;
 			}
 
  			start = 0;
 			end = ngram-1;
 			i=0;
-
+			//printf("%s\n",word );
 		
 
 			while(end<lenWord)
@@ -486,7 +488,7 @@ void LearnVocabFromTrainFile() {
 				gram[ngram] = '\0';
 
 
-				
+				//printf("%s\n",gram );
 
 				searchAndAddToVocab(gram);
 
@@ -512,7 +514,7 @@ void LearnVocabFromTrainFile() {
 
 	SortVocab();
 
-	if (debug_mode > 0) {
+	if (debug_mode > 1) {
 		printf("Vocab size: %lld\n", vocab_size);
 		printf("Words in train file: %lld\n", train_words);
 	}
@@ -560,7 +562,7 @@ void ReadVocab() {
 
 	SortVocab();
 
-	if (debug_mode > 0) {
+	if (debug_mode > 1) {
 		printf("Vocab size: %lld\n", vocab_size);
 		printf("Words in train file: %lld\n", train_words);
 	}
@@ -968,7 +970,10 @@ void TrainModel() {
 	long a, b, c, d;
 	FILE *fo;
 	pthread_t *pt = (pthread_t *)malloc(num_threads * sizeof(pthread_t));
-	printf("Starting training using file %s\n", train_file);
+
+	if(debug_mode>0)
+		printf("Starting training using file %s\n", train_file);
+
 	starting_alpha = alpha;
 
 	if (read_vocab_file[0] != 0)
@@ -995,7 +1000,8 @@ void TrainModel() {
 	for (a = 0; a < num_threads; a++)
 		pthread_join(pt[a], NULL);
 
-	printf("Training Ended !\n");
+	if(debug_mode > 0)
+		printf("Training Ended !\n");
 
 	if(ngram > 0)
 		return;
@@ -1139,7 +1145,9 @@ void createWordVectorFile(){
 	}
 
 	fprintf(fo, "%lld %lld\n", cptWord, layer1_size); //prints size
-	printf("number of words: %lld\n",cptWord );
+	
+	if(debug_mode > 0)
+		printf("number of words: %lld\n",cptWord );
 
  	
 
@@ -1228,10 +1236,12 @@ void createWordVectorFile(){
 
 
 		//removes #bangs
-		for(i=1;i<lenWord;i++){
-			word[i-1]=word[i];
+		if(hashbang > 0){
+			for(i=1;i<lenWord;i++){
+				word[i-1]=word[i];
+			}
+			word[lenWord-2]='\0';
 		}
-		word[lenWord-2]='\0';
 
 
 		fprintf(fo, "%s ", word);
@@ -1245,8 +1255,8 @@ void createWordVectorFile(){
 		fprintf(fo, "\n");
 		
 	}
-	
-	printf("Saved %lld word vectors, %d grams weren't in dictionnary, %d words were skipped (doubles)\n",cptWord,unexistCpt,skipCpt);
+	if(debug_mode > 0)
+		printf("Saved %lld word vectors, %d grams weren't in dictionnary, %d words were skipped (doubles)\n",cptWord,unexistCpt,skipCpt);
 	
 	fclose(fo);
 	fclose(fin);
