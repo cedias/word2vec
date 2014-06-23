@@ -33,6 +33,7 @@
 #define MAX_SENTENCE_LENGTH 1000
 #define MAX_CODE_LENGTH 40
 
+
 const int vocab_hash_size = 30000000;  // Maximum 30 * 0.7 = 21M words in the vocabulary
 
 typedef float real;                    // Precision of float numbers
@@ -41,12 +42,12 @@ struct vocab_word {
  	long long cn; //times of occurence in train file
  	int *point;
  	char *word, *code, codelen;
-};
+}typedef vword;
 
 char train_file[MAX_STRING], output_file[MAX_STRING];
 char save_vocab_file[MAX_STRING], read_vocab_file[MAX_STRING];
 struct vocab_word *vocab;
-int binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 5, num_threads = 1, min_reduce = 1;
+int binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 5, num_threads = 1, min_reduce = 1, ngram = 0, hashbang = 0;
 int *vocab_hash;
 long long vocab_max_size = 1000, vocab_size = 0, layer1_size = 100;
 long long train_words = 0, word_count_actual = 0, file_size = 0, classes = 0;
@@ -88,9 +89,11 @@ void InitUnigramTable() {
 // Reads a single word from a file, assuming space + tab + EOL to be word boundaries
 void ReadWord(char *word, FILE *fin) {
 	int a = 0, character;
-
+	
 	while (!feof(fin)) {
 		character = fgetc(fin);
+
+
 
 		if (character == 13) //Carriage Return
 			continue;
@@ -98,6 +101,7 @@ void ReadWord(char *word, FILE *fin) {
 		if ((character == ' ') || (character == '\t') || (character == '\n')) {
 			
 			if (a > 0) {
+
 		    	if (character == '\n')
 		    		ungetc(character, fin); //we don't want the new line char.
 		    break;
@@ -117,7 +121,30 @@ void ReadWord(char *word, FILE *fin) {
 		if (a >= MAX_STRING - 1)
 			a--;   // Truncate too long words
 	}
-	word[a] = 0;
+
+	word[a] = '\0';
+
+	if(hashbang > 0)
+	{
+
+		a = strlen(word); //'\0'
+		word[a] = '#';
+		a++;
+		word[a] = '\0';
+		a++;
+
+
+ 		while(a>0)
+ 		{
+ 			word[a] = word[a-1];
+ 			a--;
+ 		}
+
+ 		word[0] ='#';
+	}
+
+
+	return;
 }
 
 // Returns hash value of a word
@@ -129,6 +156,36 @@ int GetWordHash(char *word) {
 
 	hash = hash % vocab_hash_size;
 	return hash;
+}
+
+void DestroyVocab() {
+  int a;
+
+  for (a = 0; a < vocab_size; a++) {
+    if (vocab[a].word != NULL) {
+      free(vocab[a].word);
+    }
+    if (vocab[a].code != NULL) {
+      free(vocab[a].code);
+    }
+    if (vocab[a].point != NULL) {
+      free(vocab[a].point);
+    }
+  }
+  free(vocab[vocab_size].word);
+  free(vocab);
+}
+
+void DestroyNet() {
+  if (syn0 != NULL) {
+    free(syn0);
+  }
+  if (syn1 != NULL) {
+    free(syn1);
+  }
+  if (syn1neg != NULL) {
+    free(syn1neg);
+  }
 }
 
 // Returns position of a word in the vocabulary; if the word is not found, returns -1
@@ -161,13 +218,17 @@ int ReadWordIndex(FILE *fin) {
 
 // Adds a word to the vocabulary
 int AddWordToVocab(char *word) {
+
 	unsigned int hash, length = strlen(word) + 1;
 
 	if (length > MAX_STRING)
 		length = MAX_STRING;
 
+		
 	vocab[vocab_size].word = (char *)calloc(length, sizeof(char));
+
 	strcpy(vocab[vocab_size].word, word);
+
 	vocab[vocab_size].cn = 0;
 	vocab_size++;
 
@@ -176,7 +237,6 @@ int AddWordToVocab(char *word) {
 		vocab_max_size += 1000;
 		vocab = (struct vocab_word *)realloc(vocab, vocab_max_size * sizeof(struct vocab_word));
 	}
-
 	hash = GetWordHash(word);
 
 	while (vocab_hash[hash] != -1)
@@ -197,6 +257,9 @@ void SortVocab() {
 	int a, size;
 	unsigned int hash;
 
+	if(debug_mode > 2)
+		printf("Sorting Vocab...\n");
+
 	// Sort the vocabulary and keep </s> at the first position
 	qsort(&vocab[1], vocab_size - 1, sizeof(struct vocab_word), VocabCompare);
 
@@ -206,15 +269,17 @@ void SortVocab() {
 	size = vocab_size;
 	train_words = 0;
 
-	for (a = 0; a < size; a++) {
+	for (a = 1; a < size; a++) {
 	// Words occuring less than min_count times will be discarded from the vocab
 		if (vocab[a].cn < min_count) {
 			vocab_size--;
-			free(vocab[vocab_size].word);
+			free(vocab[vocab_size].word); 
+			//free(vocab[a].word);
+			vocab[a].word = NULL;
 		}
 		else {
 		// Hash will be re-computed, as after the sorting it is not actual
-			hash=GetWordHash(vocab[a].word);
+			hash = GetWordHash(vocab[a].word);
 
 			while (vocab_hash[hash] != -1)
 				hash = (hash + 1) % vocab_hash_size;
@@ -224,6 +289,7 @@ void SortVocab() {
 		}
 	}
 
+
 	vocab = (struct vocab_word *)realloc(vocab, (vocab_size + 1) * sizeof(struct vocab_word));
 
 	// Allocate memory for the binary tree construction
@@ -231,20 +297,25 @@ void SortVocab() {
 		vocab[a].code = (char *)calloc(MAX_CODE_LENGTH, sizeof(char));
 		vocab[a].point = (int *)calloc(MAX_CODE_LENGTH, sizeof(int));
 	}
+
 }
 
 // Reduces the vocabulary by removing infrequent tokens
 void ReduceVocab() {
+
 	int a, b = 0;
 	unsigned int hash;
 
-	for (a = 0; a < vocab_size; a++)
+	for (a = 0; a < vocab_size; a++){
 		if (vocab[a].cn > min_reduce) {
+
 			vocab[b].cn = vocab[a].cn;
 			vocab[b].word = vocab[a].word;
 			b++;
-	} else
-		free(vocab[a].word);
+
+		} else
+			free(vocab[a].word);
+	}
 
 	vocab_size = b;
 
@@ -349,13 +420,30 @@ void CreateBinaryTree() {
 	free(parent_node);
 }
 
+//Look if word already in vocab, if not add, if yes, increment.
+void searchAndAddToVocab(char* word){
+	long long a,i;
+	i = SearchVocab(word);
+
+		if (i == -1) {
+			a = AddWordToVocab(word);
+			vocab[a].cn = 1;
+		} else
+			vocab[i].cn++;
+
+		if (vocab_size > vocab_hash_size * 0.7)
+			ReduceVocab();
+}
+
 void LearnVocabFromTrainFile() {
 	char word[MAX_STRING];
 	FILE *fin;
-	long long a, i;
+	int i,start,end,lenWord;
 
-	for (a = 0; a < vocab_hash_size; a++) //init vocab hashtable
-		vocab_hash[a] = -1;
+	char gram[ngram+1];
+
+	for (i = 0; i < vocab_hash_size; i++) //init vocab hashtable
+		vocab_hash[i] = -1;
 
 	fin = fopen(train_file, "rb");
 
@@ -370,6 +458,49 @@ void LearnVocabFromTrainFile() {
 	while (1) {
 		ReadWord(word, fin);
 
+		if(ngram > 0) //learn ngrams instead of words
+		{
+			lenWord = strlen(word);
+
+			if(lenWord<=ngram){ //word smaller or equal to ngram var.
+				searchAndAddToVocab(word);
+				//printf("smaller\n");
+
+				if (feof(fin))
+					break;
+				else
+					continue;
+			}
+
+ 			start = 0;
+			end = ngram-1;
+			i=0;
+			//printf("%s\n",word );
+		
+
+			while(end<lenWord)
+			{
+
+				for (i = 0; i < ngram; i++)
+				{
+					gram[i] = word[start+i];
+				}
+				gram[ngram] = '\0';
+
+
+				//printf("%s\n",gram );
+
+				searchAndAddToVocab(gram);
+
+				end++;
+				start++;
+			}
+		}
+		else
+		{
+			searchAndAddToVocab(word);
+		}
+
 		if (feof(fin))
 			break;
 
@@ -379,22 +510,11 @@ void LearnVocabFromTrainFile() {
 			printf("%lldK%c", train_words / 1000, 13);
 			fflush(stdout);
 		}
-
-		i = SearchVocab(word);
-
-		if (i == -1) {
-			a = AddWordToVocab(word);
-			vocab[a].cn = 1;
-		} else
-			vocab[i].cn++;
-
-		if (vocab_size > vocab_hash_size * 0.7)
-			ReduceVocab();
 	}
 
 	SortVocab();
 
-	if (debug_mode > 0) {
+	if (debug_mode > 1) {
 		printf("Vocab size: %lld\n", vocab_size);
 		printf("Words in train file: %lld\n", train_words);
 	}
@@ -442,7 +562,7 @@ void ReadVocab() {
 
 	SortVocab();
 
-	if (debug_mode > 0) {
+	if (debug_mode > 1) {
 		printf("Vocab size: %lld\n", vocab_size);
 		printf("Words in train file: %lld\n", train_words);
 	}
@@ -501,12 +621,19 @@ void InitNet() {
 }
 
 void *TrainModelThread(void *id) {
-	long long a, b, d, word, last_word, sentence_length = 0, sentence_position = 0;
+	long long a, b, d, i, word, last_word, sentence_length = 0, sentence_position = 0;
 	long long word_count = 0, last_word_count = 0, sen[MAX_SENTENCE_LENGTH + 1];
 	long long l1, l2, c, target, label;
 	unsigned long long next_random = (long long)id;
 	real f, g;
 	clock_t now;
+
+	char wordToGram[MAX_STRING];
+	char gram[ngram+1];
+	int start = 0;
+	int end = ngram-1;
+	int newWord = 1;
+	int wordLength = 0;
 
 	real *neu1 = (real *)calloc(layer1_size, sizeof(real)); //one vector
 	real *neu1e = (real *)calloc(layer1_size, sizeof(real)); 
@@ -515,6 +642,7 @@ void *TrainModelThread(void *id) {
 	fseek(fi, file_size / (long long)num_threads * (long long)id, SEEK_SET);
 
 	while (1) {
+
 
 		if (word_count - last_word_count > 10000) {
 			word_count_actual += word_count - last_word_count;
@@ -537,10 +665,56 @@ void *TrainModelThread(void *id) {
 		if (sentence_length == 0) {
 
 			while (1) {
-				word = ReadWordIndex(fi);
+				
 
 				if (feof(fi))
 					break;
+				
+
+				if(ngram > 0) //learn ngrams instead of words
+				{
+					
+					
+					if(newWord){
+						ReadWord(wordToGram, fi);
+						start = 0;
+						end = ngram-1;
+						wordLength = strlen(wordToGram);
+					
+						newWord = 0;
+					}
+					
+
+					if(wordLength <= ngram){
+						word =  SearchVocab(wordToGram);
+						newWord = 1;
+						continue;
+					}
+
+					
+					for (i = 0; i < ngram; i++)
+					{
+						gram[i] = wordToGram[start+i];
+					}
+					gram[ngram] = '\0';
+
+
+					word = SearchVocab(gram);
+					
+					end++;
+					start++;
+
+					if(end == wordLength)
+						newWord = 1;
+					
+				}
+				else
+				{
+				word = ReadWordIndex(fi); 
+
+				}
+				
+
 				if (word == -1)
 					continue;
 
@@ -563,7 +737,7 @@ void *TrainModelThread(void *id) {
 				if (sentence_length >= MAX_SENTENCE_LENGTH)
 					break;
 			}
-
+			
 			sentence_position = 0;
 		}
 
@@ -796,7 +970,10 @@ void TrainModel() {
 	long a, b, c, d;
 	FILE *fo;
 	pthread_t *pt = (pthread_t *)malloc(num_threads * sizeof(pthread_t));
-	printf("Starting training using file %s\n", train_file);
+
+	if(debug_mode>0)
+		printf("Starting training using file %s\n", train_file);
+
 	starting_alpha = alpha;
 
 	if (read_vocab_file[0] != 0)
@@ -823,7 +1000,15 @@ void TrainModel() {
 	for (a = 0; a < num_threads; a++)
 		pthread_join(pt[a], NULL);
 
+	if(debug_mode > 0)
+		printf("Training Ended !\n");
+
+	if(ngram > 0)
+		return;
+
+
 	fo = fopen(output_file, "wb");
+
 
 	if (classes == 0) {
 		// Save the word vectors
@@ -914,6 +1099,169 @@ void TrainModel() {
 	fclose(fo);
 }
 
+
+void createWordVectorFile(){
+	char grama[ngram+1];
+	int hash =0;
+	char word[MAX_STRING];
+	FILE *fin, *fo;
+	int i,start,end,lenWord,indGram, offset;
+	int *hashset;
+	long long unsigned int cptWord=0;
+	int skipCpt=0;
+	int unexistCpt=0;
+	int gramCpt=0;
+
+	
+	
+
+	hashset = calloc(vocab_hash_size,sizeof(int));
+	real wordVec[layer1_size];
+
+	for(i=0;i<vocab_hash_size;i++)
+		hashset[i] = -1;
+
+	fin = fopen(train_file, "rb");
+	fo = fopen(output_file, "wb");
+
+	if (fin == NULL) {
+		printf("ERROR: training data file not found!\n");
+		exit(1);
+	}
+
+	while (1) {
+		
+		if (feof(fin))
+			break;
+
+		ReadWord(word, fin);
+		hash = GetWordHash(word);
+
+		if (hashset[hash] != -1)
+			continue;
+		else
+			hashset[hash] = 1;
+		cptWord++;
+	}
+
+	fprintf(fo, "%lld %lld\n", cptWord, layer1_size); //prints size
+	
+	if(debug_mode > 0)
+		printf("number of words: %lld\n",cptWord );
+
+ 	
+
+	/*reset*/
+	rewind(fin);
+	for(i=0;i<vocab_hash_size;i++)
+		hashset[i] = -1;
+	cptWord=0;
+
+	/*write </s>*/
+	indGram = SearchVocab("</s>");
+	offset = indGram * layer1_size;
+	fprintf(fo, "</s> ");
+	for (i = 0; i < layer1_size; i++){
+		if (binary)
+			fwrite(&wordVec[i], sizeof(real), 1, fo);
+		else
+			fprintf(fo, "%lf ", wordVec[i]);
+	}
+	fprintf(fo, "\n");
+
+
+		
+	while (1) {
+		
+		if (feof(fin))
+			break;
+
+		ReadWord(word, fin);
+
+		hash = GetWordHash(word);
+		for(i=0;i<layer1_size;i++) 
+			wordVec[i] = 0;
+
+		lenWord = strlen(word);
+		start = 0;
+		end = ngram-1;
+
+		if(hashset[hash] != -1){
+			skipCpt++;
+			continue;
+		}
+
+		while(end<lenWord)
+		{
+
+			for (i = 0; i < ngram; i++)
+			{
+				grama[i] = word[start+i];
+			}
+			grama[ngram] = '\0';
+
+			
+			
+
+			indGram = SearchVocab(grama);
+
+			if(indGram > -1)
+				offset = indGram * layer1_size;
+			else
+			{
+				unexistCpt++;
+				end++;
+				start++;
+				continue;
+			}
+			
+			//printf("gram: %s\n",grama );
+			for(i=0;i<layer1_size;i++){
+				wordVec[i] += syn0[offset+i];
+			}
+			gramCpt++;
+
+			end++;
+			start++;
+		}
+
+		//normalization
+		for(i=0;i<layer1_size;i++){
+				wordVec[i] /= gramCpt;
+		}
+
+		hashset[hash] = 1;
+		cptWord++;
+
+
+
+		//removes #bangs
+		if(hashbang > 0){
+			for(i=1;i<lenWord;i++){
+				word[i-1]=word[i];
+			}
+			word[lenWord-2]='\0';
+		}
+
+
+		fprintf(fo, "%s ", word);
+		for (i = 0; i < layer1_size; i++){
+			if (binary)
+					fwrite(&wordVec[i], sizeof(real), 1, fo);
+			else
+					fprintf(fo, "%lf ", wordVec[i]);
+		}
+		
+		fprintf(fo, "\n");
+		
+	}
+	if(debug_mode > 0)
+		printf("Saved %lld word vectors, %d grams weren't in dictionnary, %d words were skipped (doubles)\n",cptWord,unexistCpt,skipCpt);
+	
+	fclose(fo);
+	fclose(fin);
+}
+
 int ArgPos(char *str, int argc, char **argv) {
 	int a;
 	for (a = 1; a < argc; a++)
@@ -969,6 +1317,10 @@ int main(int argc, char **argv) {
 		printf("\t\tThe vocabulary will be read from <file>, not constructed from the training data\n");
 		printf("\t-cbow <int>\n");
 		printf("\t\tUse the continuous bag of words model; default is 0 (skip-gram model)\n");
+		printf("\t-ngram <int> (default 0 - use words) \n");
+		printf("\t\tUse N-GRAM model instead of words to train vectors \n");
+		printf("\t-hashbang <0-1> (default 0)\n");
+		printf("\t\tUse hashbang on n-grams - i.e #good# -> #go,goo,ood,od#\n");
 		printf("\nExamples:\n");
 		printf("./word2vec -train data.txt -output vec.txt -debug 2 -size 200 -window 5 -sample 1e-4 -negative 5 -hs 0 -binary 0 -cbow 1\n\n");
 		return 0;
@@ -994,9 +1346,12 @@ int main(int argc, char **argv) {
 	if ((i = ArgPos((char *)"-threads", argc, argv)) > 0) num_threads = atoi(argv[i + 1]);
 	if ((i = ArgPos((char *)"-min-count", argc, argv)) > 0) min_count = atoi(argv[i + 1]);
 	if ((i = ArgPos((char *)"-classes", argc, argv)) > 0) classes = atoi(argv[i + 1]);
+	if ((i = ArgPos ((char *) "-ngram", argc, argv)) > 0 ) ngram = atoi(argv[i + 1]);
+	if ((i = ArgPos ((char *) "-hashbang", argc, argv)) > 0 ) hashbang = atoi(argv[i + 1]);
 	
 
 	vocab = (struct vocab_word *)calloc(vocab_max_size, sizeof(struct vocab_word));
+
 	vocab_hash = (int *)calloc(vocab_hash_size, sizeof(int));
 	expTable = (real *)malloc((EXP_TABLE_SIZE + 1) * sizeof(real));
 
@@ -1006,5 +1361,7 @@ int main(int argc, char **argv) {
 	}
 	
 	TrainModel();
+	if(ngram > 0)
+		createWordVectorFile();
 	return 0;
 }
