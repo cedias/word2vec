@@ -47,7 +47,7 @@ struct vocab_word {
 char train_file[MAX_STRING], output_file[MAX_STRING];
 char save_vocab_file[MAX_STRING], read_vocab_file[MAX_STRING];
 struct vocab_word *vocab;
-int binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 5, num_threads = 1, min_reduce = 1, ngram = 0, hashbang = 0;
+int binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 5, num_threads = 1, min_reduce = 1, ngram = 0, hashbang = 0, group_vec = 0;
 int *vocab_hash;
 long long vocab_max_size = 1000, vocab_size = 0, layer1_size = 100;
 long long train_words = 0, word_count_actual = 0, file_size = 0, classes = 0;
@@ -1099,6 +1099,50 @@ void TrainModel() {
 	fclose(fo);
 }
 
+/*group by sum*/
+void sumGram(int offset, real* vector)
+{
+	int i;
+	for (i=0; i < layer1_size;i++)
+	{
+		vector[i]+=syn0[offset+i];
+	}
+}
+
+/*1->min 0->max*/
+void minmaxGram(int offset,real *vector,int min)
+{
+	int i;
+
+	if(min){
+		for (i=0; i < layer1_size;i++)
+		{
+			if(vector[i]>syn0[offset+i])
+				vector[i]=syn0[offset+i];
+		}
+	}
+	else
+	{
+		for (i=0; i < layer1_size;i++)
+		{
+			if(vector[i]<syn0[offset+i])
+				vector[i]=syn0[offset+i];
+		}
+	}
+}
+
+/*Divide vector by ngrams*/
+void truncGram(int offset, real *vector, int wordLength, int gramPos)
+{
+	//nbGram = wordLength - ngram + 1;
+	int nbDiv = layer1_size/(wordLength - ngram + 1);
+	int i;
+	// if nbdiv*nbGram =! layer1size
+	for(i=gramPos*nbDiv;i<layer1_size;i++)//overrides - make condition cleaner 
+	{ 
+		vector[i] = syn0[offset+i];
+	}
+}
 
 void createWordVectorFile(){
 	char grama[ngram+1];
@@ -1129,6 +1173,7 @@ void createWordVectorFile(){
 		exit(1);
 	}
 
+	/* Counting number of words in file*/
 	while (1) {
 		
 		if (feof(fin))
@@ -1170,7 +1215,7 @@ void createWordVectorFile(){
 	fprintf(fo, "\n");
 
 
-		
+	/*Writing vectors*/
 	while (1) {
 		
 		if (feof(fin))
@@ -1214,24 +1259,43 @@ void createWordVectorFile(){
 				start++;
 				continue;
 			}
-			
+			switch(group_vec){
+				case 0:
+				case 1:
+					sumGram(offset,wordVec);
+					break;
+				case 2:
+					minmaxGram(offset,wordVec,1);
+					break;
+				case 3:
+					minmaxGram(offset,wordVec,0);
+					break;
+				case 4:
+					truncGram(offset,wordVec,lenWord,gramCpt);
+					break;
+			}
 			//printf("gram: %s\n",grama );
 			for(i=0;i<layer1_size;i++){
 				wordVec[i] += syn0[offset+i];
 			}
+
 			gramCpt++;
 
 			end++;
 			start++;
 		}
 
-		//normalization
-		for(i=0;i<layer1_size;i++){
-				wordVec[i] /= gramCpt;
-		}
 
+		if(group_vec==0) //Mean
+		{
+			//normalization
+			for(i=0;i<layer1_size;i++){
+					wordVec[i] /= gramCpt;
+			}
+		}
 		hashset[hash] = 1;
 		cptWord++;
+		gramCpt = 0;
 
 
 
@@ -1321,6 +1385,8 @@ int main(int argc, char **argv) {
 		printf("\t\tUse N-GRAM model instead of words to train vectors \n");
 		printf("\t-hashbang <0-1> (default 0)\n");
 		printf("\t\tUse hashbang on n-grams - i.e #good# -> #go,goo,ood,od#\n");
+		printf("\t-group <0-5> (default 0)\n");
+		printf("\t\tHow word vectors are computed with n-grams - 0:Mean (default); 1:Sum; 2:Min; 3:Max; 4:Trunc; 5:FreqSum\n");
 		printf("\nExamples:\n");
 		printf("./word2vec -train data.txt -output vec.txt -debug 2 -size 200 -window 5 -sample 1e-4 -negative 5 -hs 0 -binary 0 -cbow 1\n\n");
 		return 0;
@@ -1348,6 +1414,7 @@ int main(int argc, char **argv) {
 	if ((i = ArgPos((char *)"-classes", argc, argv)) > 0) classes = atoi(argv[i + 1]);
 	if ((i = ArgPos ((char *) "-ngram", argc, argv)) > 0 ) ngram = atoi(argv[i + 1]);
 	if ((i = ArgPos ((char *) "-hashbang", argc, argv)) > 0 ) hashbang = atoi(argv[i + 1]);
+	if ((i = ArgPos ((char *) "-group", argc, argv)) > 0 ) group_vec = atoi(argv[i + 1]);
 	
 
 	vocab = (struct vocab_word *)calloc(vocab_max_size, sizeof(struct vocab_word));
