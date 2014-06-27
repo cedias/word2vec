@@ -31,7 +31,7 @@ int main(int argc, char **argv)
 	long long words, size, a, b, c, d, b1, b2, b3, threshold = 0;
 	float *M;
 	char *vocab;
-	int TCN, CCN = 0, TACN = 0, CACN = 0, SECN = 0, SYCN = 0, SEAC = 0, SYAC = 0, QID = 0, TQ = 0, TQS = 0;
+	int TCN, CCN = 0, TACN = 0, CACN = 0, SYCN = 0, SYAC = 0, QID = 0, TQ = 0, TQS = 0;
 	int small = 0;
 
 
