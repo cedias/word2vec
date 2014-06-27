@@ -1298,7 +1298,7 @@ void createWordVectorFile(){
 		}
 
 
-		if(group_vec==0) //Mean
+		if(group_vec==0 || group_vec==5) //Mean
 		{
 			//normalization
 			for(i=0;i<layer1_size;i++){
