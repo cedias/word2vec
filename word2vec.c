@@ -1115,7 +1115,7 @@ void sumFreqGram(int offset, real* vector,int indGram)
 	int i;
 	for (i=0; i < layer1_size;i++)
 	{
-		vector[i]+=(syn0[offset+i]* vocab[indGram].cn);
+		vector[i]+=(syn0[offset+i]* (1.00 / vocab[indGram].cn));
 	}
 }
 
@@ -1298,7 +1298,7 @@ void createWordVectorFile(){
 		}
 
 
-		if(group_vec==0 || group_vec == 5) //Mean
+		if(group_vec==0) //Mean
 		{
 			//normalization
 			for(i=0;i<layer1_size;i++){
