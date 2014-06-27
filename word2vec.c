@@ -1109,6 +1109,16 @@ void sumGram(int offset, real* vector)
 	}
 }
 
+/*group by sum*/
+void sumFreqGram(int offset, real* vector,int indGram)
+{
+	int i;
+	for (i=0; i < layer1_size;i++)
+	{
+		vector[i]+=(syn0[offset+i]* vocab[indGram].cn);
+	}
+}
+
 /*1->min 0->max*/
 void minmaxGram(int offset,real *vector,int min)
 {
@@ -1273,7 +1283,9 @@ void createWordVectorFile(){
 				case 4:
 					truncGram(offset,wordVec,lenWord,gramCpt);
 					break;
-			}
+				case 5:
+					sumFreqGram(offset,wordVec,indGram);
+								}
 			//printf("gram: %s\n",grama );
 			for(i=0;i<layer1_size;i++){
 				wordVec[i] += syn0[offset+i];
@@ -1286,7 +1298,7 @@ void createWordVectorFile(){
 		}
 
 
-		if(group_vec==0) //Mean
+		if(group_vec==0 || group_vec == 5) //Mean
 		{
 			//normalization
 			for(i=0;i<layer1_size;i++){
