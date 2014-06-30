@@ -48,6 +48,7 @@ char train_file[MAX_STRING], output_file[MAX_STRING];
 char save_vocab_file[MAX_STRING], read_vocab_file[MAX_STRING];
 struct vocab_word *vocab;
 int binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 5, num_threads = 1, min_reduce = 1, ngram = 0, hashbang = 0, group_vec = 0;
+int double_train = 0;
 int *vocab_hash;
 long long vocab_max_size = 1000, vocab_size = 0, layer1_size = 100;
 long long train_words = 0, word_count_actual = 0, file_size = 0, classes = 0;
@@ -1010,7 +1011,7 @@ void TrainModel() {
 	fo = fopen(output_file, "wb");
 
 
-	if (classes == 0) {
+	if (classes == 0 && double_train == 0 && ngram == 0) {
 		// Save the word vectors
 		fprintf(fo, "%lld %lld\n", vocab_size, layer1_size);
 		for (a = 0; a < vocab_size; a++) {
@@ -1285,10 +1286,6 @@ void createWordVectorFile(){
 					break;
 				case 5:
 					sumFreqGram(offset,wordVec,indGram);
-								}
-			//printf("gram: %s\n",grama );
-			for(i=0;i<layer1_size;i++){
-				wordVec[i] += syn0[offset+i];
 			}
 
 			gramCpt++;
@@ -1399,6 +1396,9 @@ int main(int argc, char **argv) {
 		printf("\t\tUse hashbang on n-grams - i.e #good# -> #go,goo,ood,od#\n");
 		printf("\t-group <0-5> (default 0)\n");
 		printf("\t\tHow word vectors are computed with n-grams - 0:Mean (default); 1:Sum; 2:Min; 3:Max; 4:Trunc; 5:FreqSum\n");
+		printf("\t-dt <0-1> (default 0)\n");
+		printf("\t\tDouble Train: train words and ngrams\n");
+		
 		printf("\nExamples:\n");
 		printf("./word2vec -train data.txt -output vec.txt -debug 2 -size 200 -window 5 -sample 1e-4 -negative 5 -hs 0 -binary 0 -cbow 1\n\n");
 		return 0;
@@ -1427,6 +1427,7 @@ int main(int argc, char **argv) {
 	if ((i = ArgPos ((char *) "-ngram", argc, argv)) > 0 ) ngram = atoi(argv[i + 1]);
 	if ((i = ArgPos ((char *) "-hashbang", argc, argv)) > 0 ) hashbang = atoi(argv[i + 1]);
 	if ((i = ArgPos ((char *) "-group", argc, argv)) > 0 ) group_vec = atoi(argv[i + 1]);
+	if ((i = ArgPos ((char *) "-dt", argc, argv)) > 0 ) double_train = atoi(argv[i + 1]);
 	
 
 	vocab = (struct vocab_word *)calloc(vocab_max_size, sizeof(struct vocab_word));
@@ -1440,7 +1441,17 @@ int main(int argc, char **argv) {
 	}
 	
 	TrainModel();
-	if(ngram > 0)
+	
+	if(ngram > 0 && !double_train)
 		createWordVectorFile();
+
+	if(double_train){
+		/*save old-hashtable*/
+		/*save word vectors*/
+		/*compute new vectors*/
+		/*merge both*/
+		/*pray for it to work*/
+	}
+
 	return 0;
 }
