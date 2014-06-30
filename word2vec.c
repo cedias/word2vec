@@ -1286,10 +1286,6 @@ void createWordVectorFile(){
 					break;
 				case 5:
 					sumFreqGram(offset,wordVec,indGram);
-								}
-			//printf("gram: %s\n",grama );
-			for(i=0;i<layer1_size;i++){
-				wordVec[i] += syn0[offset+i];
 			}
 
 			gramCpt++;
