@@ -61,6 +61,7 @@ real alpha = 0.025, starting_alpha, sample = 0;
 //syn0 = vectors table
 real *syn0, *syn1, *syn1neg, *expTable;
 save_vec* saveArray;
+long long unsigned int saveArrayLength = 0;
 
 clock_t start;
 
@@ -628,6 +629,25 @@ void InitNet() {
 		for (a = 0; a < vocab_size; a++)
 			syn0[a * layer1_size + b] = (rand() / (real)RAND_MAX - 0.5) / layer1_size;
 
+
+	if(saveArrayLength != 0){
+		int i,j;
+		int indWord=0, offset=0;
+		char * word;
+		for(i=0;i<saveArrayLength;i++){
+			word = saveArray[i].word;
+			indWord = SearchVocab(word);
+			
+			if(indWord<0)
+				continue;
+
+			offset = indWord*layer1_size;
+
+			for(j=0;j<layer1_size;j++)
+				syn0[offset+j] = saveArray[i].vector[j];
+		}
+	}
+
 	CreateBinaryTree();
 }
 
@@ -1170,7 +1190,7 @@ void truncGram(int offset, real *vector, int wordLength, int gramPos)
 	}
 }
 
-void createWordVector(int infile){
+long long unsigned int createWordVector(int infile){
 	FILE *fin, *fo;
 	char grama[ngram+1];
 	int hash = 0;
@@ -1181,7 +1201,6 @@ void createWordVector(int infile){
 	int skipCpt=0;
 	int unexistCpt=0;
 	int gramCpt=0;
-	char *space = "</s>";
 
 	hashset = calloc(vocab_hash_size,sizeof(int));
 	real wordVec[layer1_size];
@@ -1214,19 +1233,20 @@ void createWordVector(int infile){
 		cptWord++;
 	}
 
-	fprintf(fo, "%lld %lld\n", cptWord, layer1_size); //prints size
+	
 	
 	if(infile == 0){
-		saveArray = (save_vec*) malloc(sizeof(save_vec)*cptWord);
-		for(i=0;i<cptWord;i++)
-			saveArray = NULL;
+		saveArray = (save_vec*) calloc(sizeof(save_vec),cptWord+1); //for </s>
+		saveArrayLength = cptWord+1;
+	}
+	else
+	{
+		fprintf(fo, "%lld %lld\n", cptWord+1, layer1_size); //prints size + 1 for </s>
 	}
 
 
 	if(debug_mode > 0)
-		printf("number of words: %lld\n",cptWord );
-
- 	
+		printf("number of words: %lld\n",cptWord+1 );
 
 	/*reset*/
 	rewind(fin);
@@ -1234,35 +1254,33 @@ void createWordVector(int infile){
 		hashset[i] = -1;
 
 	for(i=0;i<layer1_size;i++) 
-			wordVec[i] = 0;
+		wordVec[i] = 0;
 
 	cptWord=0;
 
 	
 	/*write </s>*/
+
+	/*
 	indGram = SearchVocab("</s>");
-
 	offset = indGram * layer1_size;
+	*/
 
-	for(i=0;i<layer1_size;i++) 
-		wordVec[i] = syn0[offset+i];
+	for(i=0;i<layer1_size;i++)
+	{
+		wordVec[i] = 0; //syn0[offset+i];
+	}
 
-	if(infile == 0){
-		saveArray[cptWord].word = (char*) malloc(sizeof(char)*5); //</s>\0 = len 5
-		saveArray[cptWord].vector = (real*) malloc(sizeof(real)*layer1_size);
-
-		for(i=0;i<4;i++)
-		{
-			saveArray[cptWord].word[i] = space[i];
-		}
-			saveArray[cptWord].word[4] = '\0';
+	if(infile == 0){ 
+		saveArray[cptWord].word = "</s>"; //</s>\0 = len 5
+		saveArray[cptWord].vector = (real*) calloc(sizeof(real),layer1_size);
 
 		for(i=0;i<layer1_size;i++)
 			saveArray[cptWord].vector[i] = wordVec[i];
 	}
 	else
 	{
-		fprintf(fo, "</s>");
+		fprintf(fo, "</s> ");
 		for (i = 0; i < layer1_size; i++){
 			if (binary)
 				fwrite(&wordVec[i], sizeof(real), 1, fo);
@@ -1303,11 +1321,8 @@ void createWordVector(int infile){
 			{
 				grama[i] = word[start+i];
 			}
+
 			grama[ngram] = '\0';
-
-			
-			
-
 			indGram = SearchVocab(grama);
 
 			if(indGram > -1)
@@ -1338,11 +1353,9 @@ void createWordVector(int infile){
 			}
 
 			gramCpt++;
-
 			end++;
 			start++;
 		}
-
 
 		if(group_vec==0 || group_vec==5) //Mean
 		{
@@ -1351,11 +1364,8 @@ void createWordVector(int infile){
 					wordVec[i] /= gramCpt;
 			}
 		}
-		hashset[hash] = 1;
-		
+		hashset[hash] = 1;		
 		gramCpt = 0;
-
-
 
 		//removes #bangs
 		if(hashbang > 0){
@@ -1365,7 +1375,7 @@ void createWordVector(int infile){
 			word[lenWord-2]='\0';
 		}
 
-		if(infile){
+		if(infile==1){
 			fprintf(fo, "%s ", word);
 
 			for (i = 0; i < layer1_size; i++){
@@ -1394,14 +1404,70 @@ void createWordVector(int infile){
 		cptWord++;
 		
 	}
+
 	if(debug_mode > 0)
 		printf("Saved %lld word vectors, %d grams weren't in dictionnary, %d words were skipped (doubles)\n",cptWord,unexistCpt,skipCpt);
-	
-	printf("hello\n" );
+
 	fclose(fo);
-	printf("bye");
 	fclose(fin);
 	free(hashset);
+
+	if(infile==0)
+		return cptWord;
+	else
+		return 0;
+}
+
+void mergeAndSaveVectors(){
+
+	int i = 0;
+	int j = 0;
+	int indWord;
+	int offset;
+	char * word;
+	real wordVec[layer1_size];
+	FILE *fo;
+
+	fo = fopen(output_file, "wb");
+	fprintf(fo, "%lld %lld\n", saveArrayLength, layer1_size); //prints size
+
+	for(i=0;i<saveArrayLength;i++){
+		word = saveArray[i].word;
+
+		for (j = 0; j < layer1_size; j++)
+		{
+			wordVec[j] = saveArray[i].vector[j];
+		}
+		
+		indWord = SearchVocab(word);
+		
+		if(indWord == -1)
+		{
+			printf("word %s not in vocab, skipped\n",word );
+		}
+		else
+		{
+			offset = indWord*layer1_size;
+
+			for (j = 0; j < layer1_size; j++)
+			{
+				wordVec[j] = (wordVec[j] + syn0[offset+j])/2; //sum
+			}
+		}
+		
+		//save to file
+
+		fprintf(fo, "%s ", word);
+
+			for (j = 0; j < layer1_size; j++){
+				if (binary)
+						fwrite(&wordVec[j], sizeof(real), 1, fo);
+				else
+						fprintf(fo, "%lf ", wordVec[j]);
+			}
+
+		fprintf(fo, "\n");
+	}
 }
 
 int ArgPos(char *str, int argc, char **argv) {
@@ -1511,8 +1577,11 @@ int main(int argc, char **argv) {
 	
 	TrainModel();
 	
-	if(ngram > 0 && double_train == 0)
+	if(ngram > 0 && double_train == 0){
+		printf("Creating word vectors.\n");
 		createWordVector(1);
+
+	}
 
 
 	if(double_train>0){
@@ -1527,13 +1596,17 @@ int main(int argc, char **argv) {
 
 		ngram = 0;
 		hashbang = 0;
-			
+		train_words = 0;
+		word_count_actual = 0;
+		min_count = 5;
+		sample = 0.00001;
+		negative = 5;
+		alpha = 0.025;
+		double_train = 0;
+		printf("Training again\n");
 		TrainModel();
 
-		
-
-		/*merge both*/
-		/*pray for it to work*/
+		mergeAndSaveVectors();
 	}
 
 	free(vocab_hash);
