@@ -53,7 +53,7 @@ char train_file[MAX_STRING], output_file[MAX_STRING];
 char save_vocab_file[MAX_STRING], read_vocab_file[MAX_STRING];
 struct vocab_word *vocab;
 int binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 5, num_threads = 1, min_reduce = 1, ngram = 0, hashbang = 0, group_vec = 0;
-int double_train = 0;
+int double_train = 0; int dtinit = 0;
 int *vocab_hash;
 long long vocab_max_size = 1000, vocab_size = 0, layer1_size = 100;
 long long train_words = 0, word_count_actual = 0, file_size = 0, classes = 0;
@@ -630,7 +630,7 @@ void InitNet() {
 			syn0[a * layer1_size + b] = (rand() / (real)RAND_MAX - 0.5) / layer1_size;
 
 
-	if(saveArrayLength != 0){
+	if(saveArrayLength != 0 && dtinit==1){
 		int i,j;
 		int indWord=0, offset=0;
 		char * word;
@@ -1426,6 +1426,7 @@ void mergeAndSaveVectors(){
 	int offset;
 	char * word;
 	real wordVec[layer1_size];
+	int cptSkipped = 0;
 	FILE *fo;
 
 	fo = fopen(output_file, "wb");
@@ -1443,7 +1444,7 @@ void mergeAndSaveVectors(){
 		
 		if(indWord == -1)
 		{
-			printf("word %s not in vocab, skipped\n",word );
+			cptSkipped++;
 		}
 		else
 		{
@@ -1451,7 +1452,7 @@ void mergeAndSaveVectors(){
 
 			for (j = 0; j < layer1_size; j++)
 			{
-				wordVec[j] = (wordVec[j] + syn0[offset+j])/2; //sum
+				wordVec[j] = (wordVec[j] + syn0[offset+j])/2; //mean
 			}
 		}
 		
@@ -1468,6 +1469,7 @@ void mergeAndSaveVectors(){
 
 		fprintf(fo, "\n");
 	}
+	printf("skipped %d/%lld words, they were down-sampled by word training - they only have syntactic vectors \n",cptSkipped,saveArrayLength );
 }
 
 int ArgPos(char *str, int argc, char **argv) {
@@ -1533,6 +1535,8 @@ int main(int argc, char **argv) {
 		printf("\t\tHow word vectors are computed with n-grams - 0:Mean (default); 1:Sum; 2:Min; 3:Max; 4:Trunc; 5:FreqSum\n");
 		printf("\t-dt <0-1> (default 0)\n");
 		printf("\t\tDouble Train: train words and ngrams\n");
+		printf("\t-dtinit <0-1> (default 0)\n");
+		printf("\t\tDouble Train: use trained vectors as init for words\n");
 		
 		printf("\nExamples:\n");
 		printf("./word2vec -train data.txt -output vec.txt -debug 2 -size 200 -window 5 -sample 1e-4 -negative 5 -hs 0 -binary 0 -cbow 1\n\n");
@@ -1563,6 +1567,7 @@ int main(int argc, char **argv) {
 	if ((i = ArgPos ((char *) "-hashbang", argc, argv)) > 0 ) hashbang = atoi(argv[i + 1]);
 	if ((i = ArgPos ((char *) "-group", argc, argv)) > 0 ) group_vec = atoi(argv[i + 1]);
 	if ((i = ArgPos ((char *) "-dt", argc, argv)) > 0 ) double_train = atoi(argv[i + 1]);
+	if ((i = ArgPos ((char *) "-dtinit", argc, argv)) > 0 ) dtinit = atoi(argv[i + 1]);
 	
 
 	vocab = (struct vocab_word *)calloc(vocab_max_size, sizeof(struct vocab_word));
