@@ -11,7 +11,7 @@ struct vocab_word {
  	char *word, *code, codelen;
 };
 
-struct vocabulary_struct
+typedef struct vocabulary_struct
 {
 	int vocab_hash_size;
 	unsigned long long int train_words;
@@ -20,7 +20,7 @@ struct vocabulary_struct
 	int* vocab_hash;
 	struct vocab_word *vocab;
 
-} typedef vocabulary;
+} vocabulary;
 
 /*Inits a vocabulary */
 vocabulary *InitVocabulary(int vocab_hash_size, unsigned long long vocab_max_size);
