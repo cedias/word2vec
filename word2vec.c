@@ -30,16 +30,14 @@
 #include "vocab.h"
 #include "trainingThread.h"
 
-#define MAX_STRING 100
-#define EXP_TABLE_SIZE 1000
 #define MAX_EXP 6
-#define MAX_SENTENCE_LENGTH 1000
-#define MAX_CODE_LENGTH 40
+#define MAX_STRING 100
 
 
 
 typedef float real;     // Precision of float numbers
 
+int EXP_TABLE_SIZE = 1000;
 
 char train_file[MAX_STRING], output_file[MAX_STRING];
 char save_vocab_file[MAX_STRING], read_vocab_file[MAX_STRING];
@@ -155,13 +153,39 @@ void TrainModel(vocabulary* voc) {
 
 	start = clock();
 
-	struct threadParameters* params; 
+	threadParameters* params; 
 
 	for (a = 0; a < num_threads; a++){
-		params = malloc(sizeof(struct threadParameters));
-		params->voc = voc;
-		params->threadNumber = a;
-		pthread_create(&pt[a], NULL, TrainModelThread, (void *)params);
+		params = CreateParametersStruct(
+			voc,
+			syn0,
+			syn1,
+			syn1neg,
+			expTable,
+			(&alpha),
+			starting_alpha,
+			sample,
+			(&word_count_actual),
+			table,
+			a,
+			num_threads,
+			file_size,
+			MAX_STRING,
+			EXP_TABLE_SIZE,
+			ngram,
+			layer1_size,
+			window,
+			MAX_EXP,
+			hs,
+			negative,
+			table_size,
+			train_file
+			);
+
+		if(cbow)
+			pthread_create(&pt[a], NULL, TrainCBOWModelThread, (void *)params);
+		else
+			pthread_create(&pt[a], NULL, TrainSKIPModelThread, (void *)params);
 	}
 
 	for (a = 0; a < num_threads; a++)
