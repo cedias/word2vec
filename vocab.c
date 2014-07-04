@@ -453,7 +453,6 @@ long long LearnNGramFromTrainFile(vocabulary* voc, char* train_file,int min_coun
 			if(position)
 				addGramPosition(gram,ngram,start,end,lenWord);
 
-			printf("ajoute %s\n",gram );
 			searchAndAddToVocab(voc,gram);
 			
 			end++;
