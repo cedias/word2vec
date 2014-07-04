@@ -146,7 +146,7 @@ void *TrainCBOWModelThread(void *arg) {
 					
 					
 					if(newWord){
-						ReadWord(wordToGram, fi,1);
+						ReadWordHashbang(wordToGram, fi);
 						start = 0;
 						end = ngram-1;
 						wordLength = strlen(wordToGram);
@@ -436,7 +436,7 @@ void *TrainSKIPModelThread(void *arg) {
 					
 					
 					if(newWord){
-						ReadWord(wordToGram, fi,1);
+						ReadWordHashbang(wordToGram, fi);
 						start = 0;
 						end = ngram-1;
 						wordLength = strlen(wordToGram);

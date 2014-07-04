@@ -4,12 +4,24 @@
 #include "vocab.h"
 
 /*Inits a vocabulary*/
-vocabulary* InitVocabulary(int vocab_hash_size, unsigned long long vocab_max_size){
-	int i;
+vocabulary* InitVocabulary( int vocab_hash_size, unsigned long long int vocab_max_size){
+	unsigned long long i;
 
 	vocabulary* voc = (vocabulary*) malloc(sizeof(vocabulary));
-	voc->vocab_hash = (int *) calloc(vocab_hash_size, sizeof(int));
+	if(voc == NULL){
+		printf("vocabulary couldn't be created, memory problem, exiting...\n");
+		exit(1);
+	}
+	voc->vocab_hash = (unsigned long long int *) calloc(vocab_hash_size, sizeof(unsigned long long int));
+	if(voc == NULL){
+		printf("vocabulary hash couldn't be created, memory problem, exiting...\n");
+		exit(1);
+	}
+
 	voc->vocab = (struct vocab_word *) calloc(vocab_max_size, sizeof(struct vocab_word));
+	if(voc == NULL){
+		printf("vocabulary hash couldn't be created, memory problem, exiting...\n");
+	}
 	voc->vocab_size = 0;
 	voc->vocab_hash_size = vocab_hash_size;
 	voc->vocab_max_size = vocab_max_size;
@@ -25,7 +37,44 @@ vocabulary* InitVocabulary(int vocab_hash_size, unsigned long long vocab_max_siz
 
 
 /*Reads a word from file descriptor fin*/
-void ReadWord(char *word, FILE *fin, int hashbang) {
+void ReadWord(char *word, FILE *fin) {
+	int a = 0, character;
+	
+	while (!feof(fin)) {
+		character = fgetc(fin);
+
+		if (character == 13) //Carriage Return
+			continue;
+
+		if ((character == ' ') || (character == '\t') || (character == '\n')) {
+			
+			if (a > 0) {
+		    	if (character == '\n')
+		    		ungetc(character, fin); //we don't want the new line char.
+		    break;
+		  	}
+
+		 	if (character == '\n') { 
+			    strcpy(word, (char *)"</s>");  //newline become </s> in corpus
+			    return;
+		  	}
+		 	else
+		  		continue;
+		}
+
+		word[a] = character;
+		a++;
+
+		if (a >= MAX_STRING - 1)
+			a--;   // Truncate too long words
+	}
+
+	word[a] = '\0';
+	return;
+}
+
+/*Reads a word and adds #hashbangs# around it from file descriptor fin*/
+void ReadWordHashbang(char *word, FILE *fin) {
 	int a = 0, character;
 	
 	while (!feof(fin)) {
@@ -59,26 +108,23 @@ void ReadWord(char *word, FILE *fin, int hashbang) {
 
 	word[a] = '\0';
 
-	if(hashbang > 0)
+ 	//adding #word#
+	a = strlen(word); //'\0'
+	word[a] = '#';
+	a++;
+	word[a] = '\0';
+	a++;
+
+	while(a>0)
 	{
-
-		a = strlen(word); //'\0'
-		word[a] = '#';
-		a++;
-		word[a] = '\0';
-		a++;
-
- 		while(a>0)
- 		{
- 			word[a] = word[a-1];
- 			a--;
- 		}
-
- 		word[0] ='#';
+		word[a] = word[a-1];
+		a--;
 	}
 
+	word[0] ='#';
 	return;
 }
+
 
 /* Returns hash value of a word*/
 int GetWordHash(vocabulary* voc, char *word) {
@@ -131,7 +177,7 @@ int SearchVocab(vocabulary* voc, char *word) {
 /* Reads a word and returns its index in the vocabulary*/
 int ReadWordIndex(vocabulary* voc, FILE *fin) {
 	char word[MAX_STRING];
-	ReadWord(word, fin, 0);
+	ReadWord(word, fin);
 
 	if (feof(fin)) 
 		return -1;
@@ -274,7 +320,54 @@ void searchAndAddToVocab(vocabulary* voc, char* word){
 }
 
 /*Create a vocab from train file*/
-long long LearnVocabFromTrainFile(vocabulary* voc, char* train_file,int min_count, int ngram, int hashbang) {
+long long LearnVocabFromTrainFile(vocabulary* voc, char* train_file,int min_count) {
+	int i;
+	char word[MAX_STRING];
+	FILE * fin;
+
+	for (i = 0; i < voc->vocab_hash_size; i++) //init vocab hashtable
+		voc->vocab_hash[i] = -1;
+
+	fin = fopen(train_file, "rb");
+
+	if (fin == NULL) {
+		printf("ERROR: training data file not found!\n");
+		exit(1);
+	}
+	
+	voc->vocab_size = 0;
+	AddWordToVocab(voc, (char *)"</s>");
+
+	while (1) {
+
+		ReadWord(word, fin);
+		searchAndAddToVocab(voc,word);
+		
+		if (feof(fin))
+			break;
+
+		voc->train_words++;
+
+		if ((DEBUG_MODE > 1) && (voc->train_words % 100000 == 0)) {
+			printf("%lldK%c", voc->train_words / 1000, 13);
+			fflush(stdout);
+		}
+	}
+
+	SortVocab(voc,min_count);
+
+	if (DEBUG_MODE > 1) {
+		printf("Vocab size: %lld\n", voc->vocab_size);
+		printf("Words in train file: %lld\n", voc->train_words);
+	}
+
+	long long file_size = ftell(fin);
+	fclose(fin);
+	return file_size;
+}
+
+/*Create a vocab of ngram from train file*/
+long long LearnNGramFromTrainFile(vocabulary* voc, char* train_file,int min_count, int ngram, int hashbang) {
 	char word[MAX_STRING];
 	int i,start,end,lenWord;
 	FILE * fin;
@@ -296,51 +389,45 @@ long long LearnVocabFromTrainFile(vocabulary* voc, char* train_file,int min_coun
 
 	while (1) {
 
-		ReadWord(word, fin, hashbang);
-
-		if(ngram > 0) //learn ngrams instead of words
-		{
-			lenWord = strlen(word);
-
-			if(lenWord<=ngram){ //word smaller or equal to ngram var.
-				searchAndAddToVocab(voc,word);
-
-				if (feof(fin))
-					break;
-				else
-					continue;
-			}
-
- 			start = 0;
-			end = ngram-1;
-			i=0;
-
-			while(end<lenWord)
-			{
-
-				for (i = 0; i < ngram; i++)
-				{
-					gram[i] = word[start+i];
-				}
-				gram[ngram] = '\0';
-
-				searchAndAddToVocab(voc,gram);
-
-				end++;
-				start++;
-			}
-		}
+		if(hashbang)
+			ReadWordHashbang(word,fin);
 		else
-		{
+			ReadWord(word,fin);
+
+		lenWord = strlen(word);
+
+		if(lenWord<=ngram){ //word smaller or equal to ngram var.
 			searchAndAddToVocab(voc,word);
+
+			if (feof(fin))
+				break;
+			else
+				continue;
+		}
+
+		start = 0;
+		end = ngram-1;
+		i=0;
+
+		while(end<lenWord)
+		{
+
+			for (i = 0; i < ngram; i++)
+			{
+				gram[i] = word[start+i];
+			}
+			gram[ngram] = '\0';
+
+			searchAndAddToVocab(voc,gram);
+
+			end++;
+			start++;
 		}
 
 		if (feof(fin))
 			break;
 
 		voc->train_words++;
-
-		
 
 		if ((DEBUG_MODE > 1) && (voc->train_words % 100000 == 0)) {
 			printf("%lldK%c", voc->train_words / 1000, 13);
@@ -372,7 +459,7 @@ void SaveVocab(vocabulary* voc, char* save_vocab_file) {
 }
 
 /*Reads a saved vocab file*/
-long long ReadVocab(vocabulary* voc, char* read_vocab_file, char* train_file) {
+long long ReadVocab(vocabulary* voc, char* read_vocab_file, char* train_file,int min_count) {
 	long long a, i = 0;
 	char c;
 	char word[MAX_STRING];
@@ -389,7 +476,7 @@ long long ReadVocab(vocabulary* voc, char* read_vocab_file, char* train_file) {
 	voc->vocab_size = 0;
 
 	while (1) {
-		ReadWord(word, fin, 0);
+		ReadWord(word, fin);
 
 		if (feof(fin))
 			break;
@@ -399,7 +486,7 @@ long long ReadVocab(vocabulary* voc, char* read_vocab_file, char* train_file) {
 		i++;
 	}
 
-	SortVocab(voc,0);
+	SortVocab(voc,min_count);
 
 	if (DEBUG_MODE > 1) {
 		printf("Vocab size: %lld\n", voc->vocab_size);

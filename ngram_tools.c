@@ -2,7 +2,7 @@
 #include "ngram_tools.h"
 
 
-void CreateWordVector(vocabulary* voc, real* syn0,int max_string, int layer1_size, int ngram, int hashbang,int group_vec, int binary, char* train_file, char* output_file){
+void gramVocToWordVec(vocabulary* voc, real* syn0,int max_string, int layer1_size, int ngram, int hashbang,int group_vec, int binary, char* train_file, char* output_file){
 
 	FILE *fin, *fo;
 	char grama[ngram+1];

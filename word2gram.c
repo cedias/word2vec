@@ -29,7 +29,7 @@
 
 #include "vocab.h"
 #include "trainingThread.h"
-
+#include "ngram_tools.h"
 
 #define MAX_EXP 6
 #define MAX_STRING 100
@@ -41,7 +41,7 @@ int EXP_TABLE_SIZE = 1000;
 char train_file[MAX_STRING], output_file[MAX_STRING];
 char save_vocab_file[MAX_STRING], read_vocab_file[MAX_STRING];
 
-int binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 5, num_threads = 1;
+int binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 5, num_threads = 1, min_reduce = 1, ngram = 3, hashbang = 0, group_vec = 0;
 int layer1_size = 100;
 
 long long word_count_actual = 0, file_size = 0, classes = 0;
@@ -171,7 +171,7 @@ void TrainModel(vocabulary* voc) {
 			file_size,
 			MAX_STRING,
 			EXP_TABLE_SIZE,
-			0,
+			ngram,
 			layer1_size,
 			window,
 			MAX_EXP,
@@ -195,97 +195,7 @@ void TrainModel(vocabulary* voc) {
 	if(debug_mode > 0)
 		printf("Training Ended !\n");
 
-	fo = fopen(output_file, "wb");
 
-
-	if (classes == 0) {
-		// Save the word vectors
-		fprintf(fo, "%lld %d\n", voc->vocab_size, layer1_size);
-		for (a = 0; a < voc->vocab_size; a++) {
-			fprintf(fo, "%s ", voc->vocab[a].word);
-
-			if (binary)
-				for (b = 0; b < layer1_size; b++)
-					fwrite(&syn0[a * layer1_size + b], sizeof(real), 1, fo);
-			else
-				for (b = 0; b < layer1_size; b++)
-					fprintf(fo, "%lf ", syn0[a * layer1_size + b]);
-
-			fprintf(fo, "\n");
-		}
-	} else {
-		// Run K-means on the word vectors
-		int clcn = classes, iter = 10, closeid;
-		int *centcn = (int *)malloc(classes * sizeof(int));
-		int *cl = (int *)calloc(voc->vocab_size, sizeof(int));
-		real closev, x;
-		real *cent = (real *)calloc(classes * layer1_size, sizeof(real));
-
-		for (a = 0; a < voc->vocab_size; a++)
-			cl[a] = a % clcn;
-
-		for (a = 0; a < iter; a++) {
-			for (b = 0; b < clcn * layer1_size; b++)
-				cent[b] = 0;
-
-			for (b = 0; b < clcn; b++)
-				centcn[b] = 1;
-
-			for (c = 0; c < voc->vocab_size; c++) {
-
-				for (d = 0; d < layer1_size; d++)
-					cent[layer1_size * cl[c] + d] += syn0[c * layer1_size + d];
-
-				centcn[cl[c]]++;
-			}
-
-			for (b = 0; b < clcn; b++) {
-				closev = 0;
-
-				for (c = 0; c < layer1_size; c++) {
-					cent[layer1_size * b + c] /= centcn[b];
-					closev += cent[layer1_size * b + c] * cent[layer1_size * b + c];
-				}
-
-				closev = sqrt(closev);
-				for (c = 0; c < layer1_size; c++)
-					cent[layer1_size * b + c] /= closev;
-			}
-
-			for (c = 0; c < voc->vocab_size; c++) {
-				closev = -10;
-				closeid = 0;
-				for (d = 0; d < clcn; d++) {
-					x = 0;
-					for (b = 0; b < layer1_size; b++)
-						x += cent[layer1_size * d + b] * syn0[c * layer1_size + b];
-
-					if (x > closev) {
-						closev = x;
-						closeid = d;
-					}
-				}
-				cl[c] = closeid;
-			}
-		}
-		// Save the K-means classes
-
-		for (a = 0; a < voc->vocab_size; a++){
-			fprintf(fo, "%s %d ", voc->vocab[a].word, cl[a]);
-
-			for (b = 0; b < layer1_size; b++){
-				fprintf(fo, "%lf ", syn0[a * layer1_size + b]);
-			}
-			fprintf(fo, "\n");
-		}
-
-		free(centcn);
-		free(cent);
-		free(cl);
-		
-	}
-
-	fclose(fo);
 	free(pt);
 
 }
@@ -334,19 +244,17 @@ int main(int argc, char **argv) {
 		printf("\t\tThis will discard words that appear less than <int> times; default is 5\n");
 		printf("\t-alpha <float>\n");
 		printf("\t\tSet the starting learning rate; default is 0.025\n");
-		printf("\t-classes <int>\n");
-		printf("\t\tOutput word classes rather than word vectors; default number of classes is 0 (vectors are written)\n");
-		printf("\t-debug <int>\n");
-		printf("\t\tSet the debug mode (default = 2 = more info during training)\n");
 		printf("\t-binary <int>\n");
 		printf("\t\tSave the resulting vectors in binary moded; default is 0 (off)\n");
-		printf("\t-save-vocab <file>\n");
-		printf("\t\tThe vocabulary will be saved to <file>\n");
-		printf("\t-read-vocab <file>\n");
-		printf("\t\tThe vocabulary will be read from <file>, not constructed from the training data\n");
 		printf("\t-cbow <int>\n");
 		printf("\t\tUse the continuous bag of words model; default is 0 (skip-gram model)\n");
-
+		printf("\t-ngram <int> (default 0 - use words) \n");
+		printf("\t\tUse N-GRAM model instead of words to train vectors \n");
+		printf("\t-hashbang <0-1> (default 0)\n");
+		printf("\t\tUse hashbang on n-grams - i.e #good# -> #go,goo,ood,od#\n");
+		printf("\t-group <0-5> (default 0)\n");
+		printf("\t\tHow word vectors are computed with n-grams - 0:Mean (default); 1:Sum; 2:Min; 3:Max; 4:Trunc; 5:FreqSum\n");
+		
 		printf("\nExamples:\n");
 		printf("./word2vec -train data.txt -output vec.txt -debug 2 -size 200 -window 5 -sample 1e-4 -negative 5 -hs 0 -binary 0 -cbow 1\n\n");
 		return 0;
@@ -358,9 +266,6 @@ int main(int argc, char **argv) {
 
 	if ((i = ArgPos((char *)"-size", argc, argv)) > 0)layer1_size = atoi(argv[i + 1]);
 	if ((i = ArgPos((char *)"-train", argc, argv)) > 0) strcpy(train_file, argv[i + 1]);
-	if ((i = ArgPos((char *)"-save-vocab", argc, argv)) > 0) strcpy(save_vocab_file, argv[i + 1]);
-	if ((i = ArgPos((char *)"-read-vocab", argc, argv)) > 0) strcpy(read_vocab_file, argv[i + 1]);
-	if ((i = ArgPos((char *)"-debug", argc, argv)) > 0) debug_mode = atoi(argv[i + 1]);
 	if ((i = ArgPos((char *)"-binary", argc, argv)) > 0) binary = atoi(argv[i + 1]);
 	if ((i = ArgPos((char *)"-cbow", argc, argv)) > 0) cbow = atoi(argv[i + 1]);
 	if ((i = ArgPos((char *)"-alpha", argc, argv)) > 0) alpha = atof(argv[i + 1]);
@@ -371,8 +276,9 @@ int main(int argc, char **argv) {
 	if ((i = ArgPos((char *)"-negative", argc, argv)) > 0) negative = atoi(argv[i + 1]);
 	if ((i = ArgPos((char *)"-threads", argc, argv)) > 0) num_threads = atoi(argv[i + 1]);
 	if ((i = ArgPos((char *)"-min-count", argc, argv)) > 0) min_count = atoi(argv[i + 1]);
-	if ((i = ArgPos((char *)"-classes", argc, argv)) > 0) classes = atoi(argv[i + 1]);
-
+	if ((i = ArgPos ((char *) "-ngram", argc, argv)) > 0 ) ngram = atoi(argv[i + 1]);
+	if ((i = ArgPos ((char *) "-hashbang", argc, argv)) > 0 ) hashbang = atoi(argv[i + 1]);
+	if ((i = ArgPos ((char *) "-group", argc, argv)) > 0 ) group_vec = atoi(argv[i + 1]);
 	
 	expTable = (real *)malloc((EXP_TABLE_SIZE + 1) * sizeof(real));
 
@@ -384,26 +290,25 @@ int main(int argc, char **argv) {
 	/**
 	Fixed starting Parameters:
 	**/
-	const int vocab_hash_size =  30000000;  // Maximum 30 * 0.7 = 21M words in the vocabulary
-	const int vocab_max_size = 1000;
+	const unsigned long vocab_hash_size =  3000000;  // Maximum 30 * 0.7 = 21M words in the vocabulary
+	const unsigned long vocab_max_size = 1000;
+
 
 	//1: init vocabulary
 	vocabulary* vocab = InitVocabulary(vocab_hash_size,vocab_max_size);
 
 	//2: load vocab
-	if (read_vocab_file[0] != 0)
-		ReadVocab(vocab,read_vocab_file,train_file,min_count);
-	else
-		LearnVocabFromTrainFile(vocab,train_file,min_count);
-
-	if (save_vocab_file[0] != 0)
-		SaveVocab(vocab,save_vocab_file);
+	LearnNGramFromTrainFile(vocab,train_file,min_count,ngram,hashbang);
 
 	if (output_file[0] == 0) //nowhere to output => quit
 		return 0;
 
 	//3: train_model
 	TrainModel(vocab);
+	
+	//4: make word vectors
+	printf("Creating word vectors.\n");
+	gramVocToWordVec(vocab,syn0,MAX_STRING,layer1_size,ngram,hashbang,group_vec,binary,train_file,output_file);
 
 	free(expTable);
 	DestroyNet();
