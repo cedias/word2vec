@@ -304,6 +304,37 @@ void ReduceVocab(vocabulary* voc, int min_reduce) {
 	min_reduce++;
 }
 
+/* Adds position to gram Ngram - gram tab size is ngram+3 index: [0->ngram+2]*/
+void addGramPosition(char * gram,int ngram, int start,int end,int lenWord){
+	int i;
+	if(gram[0]=='#' || gram[ngram-1]=='#')
+		return;
+
+	if(start==1)
+	{
+		gram[ngram]='-';
+		gram[ngram+1]='\0'; 
+		return;
+	}
+
+	if(end == lenWord-2){
+		for(i=ngram+1;i>0;i--){
+			gram[i]=gram[i-1];
+		}
+		gram[0]='-';
+		return;
+	}
+
+	for(i=ngram+1;i>0;i--){
+			gram[i]=gram[i-1];
+		}
+		gram[0]='-';
+		gram[ngram+1]='-';
+		gram[ngram+2]='\0';
+
+	return;
+}
+
 /*Look if word already in vocab, if not add, if yes, increment. */
 void searchAndAddToVocab(vocabulary* voc, char* word){
 	long long a,i;
@@ -367,12 +398,12 @@ long long LearnVocabFromTrainFile(vocabulary* voc, char* train_file,int min_coun
 }
 
 /*Create a vocab of ngram from train file*/
-long long LearnNGramFromTrainFile(vocabulary* voc, char* train_file,int min_count, int ngram, int hashbang) {
+long long LearnNGramFromTrainFile(vocabulary* voc, char* train_file,int min_count, int ngram, int hashbang, int position) {
 	char word[MAX_STRING];
 	int i,start,end,lenWord;
 	FILE * fin;
 	
-	char gram[ngram+1];
+	char gram[ngram+3]; //one for '\0, 2 for position'
 
 	for (i = 0; i < voc->vocab_hash_size; i++) //init vocab hashtable
 		voc->vocab_hash[i] = -1;
@@ -408,7 +439,7 @@ long long LearnNGramFromTrainFile(vocabulary* voc, char* train_file,int min_coun
 		start = 0;
 		end = ngram-1;
 		i=0;
-
+		
 		while(end<lenWord)
 		{
 
@@ -418,8 +449,13 @@ long long LearnNGramFromTrainFile(vocabulary* voc, char* train_file,int min_coun
 			}
 			gram[ngram] = '\0';
 
-			searchAndAddToVocab(voc,gram);
+			
+			if(position)
+				addGramPosition(gram,ngram,start,end,lenWord);
 
+			printf("ajoute %s\n",gram );
+			searchAndAddToVocab(voc,gram);
+			
 			end++;
 			start++;
 		}
@@ -434,7 +470,7 @@ long long LearnNGramFromTrainFile(vocabulary* voc, char* train_file,int min_coun
 			fflush(stdout);
 		}
 	}
-
+	printf("Vocab size: %lld  - min_count %d \n", voc->vocab_size,min_count);
 	SortVocab(voc,min_count);
 
 	if (DEBUG_MODE > 1) {

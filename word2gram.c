@@ -218,7 +218,7 @@ int ArgPos(char *str, int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
-	int i;
+	int i,position=0;
 	if (argc == 1) {
 		printf("WORD VECTOR estimation toolkit v 0.1b\n\n");
 		printf("Options:\n");
@@ -254,6 +254,8 @@ int main(int argc, char **argv) {
 		printf("\t\tUse hashbang on n-grams - i.e #good# -> #go,goo,ood,od#\n");
 		printf("\t-group <0-5> (default 0)\n");
 		printf("\t\tHow word vectors are computed with n-grams - 0:Mean (default); 1:Sum; 2:Min; 3:Max; 4:Trunc; 5:FreqSum\n");
+		printf("\t-pos <0-1> (default 0)\n");
+		printf("\t\tAdds position indication to ngrams\n");
 		
 		printf("\nExamples:\n");
 		printf("./word2vec -train data.txt -output vec.txt -debug 2 -size 200 -window 5 -sample 1e-4 -negative 5 -hs 0 -binary 0 -cbow 1\n\n");
@@ -279,6 +281,7 @@ int main(int argc, char **argv) {
 	if ((i = ArgPos ((char *) "-ngram", argc, argv)) > 0 ) ngram = atoi(argv[i + 1]);
 	if ((i = ArgPos ((char *) "-hashbang", argc, argv)) > 0 ) hashbang = atoi(argv[i + 1]);
 	if ((i = ArgPos ((char *) "-group", argc, argv)) > 0 ) group_vec = atoi(argv[i + 1]);
+	if ((i = ArgPos ((char *) "-pos", argc, argv)) > 0 ) position = atoi(argv[i + 1]);
 	
 	expTable = (real *)malloc((EXP_TABLE_SIZE + 1) * sizeof(real));
 
@@ -298,7 +301,7 @@ int main(int argc, char **argv) {
 	vocabulary* vocab = InitVocabulary(vocab_hash_size,vocab_max_size);
 
 	//2: load vocab
-	LearnNGramFromTrainFile(vocab,train_file,min_count,ngram,hashbang);
+	LearnNGramFromTrainFile(vocab,train_file,min_count,ngram,hashbang,position);
 
 	if (output_file[0] == 0) //nowhere to output => quit
 		return 0;

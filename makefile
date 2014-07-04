@@ -3,10 +3,10 @@ CC = gcc
 CFLAGS = -lm -pthread -Ofast -march=native -Wall  -Wno-unused-result -funroll-loops -g
 #
 
-all: word2vec word2phrase distance word-analogy compute-accuracy compute-accuracy-syntax 
+all: word2gram word2vec word2phrase distance word-analogy compute-accuracy compute-accuracy-syntax 
 
 word2gram : word2gram.c
-	$(CC) word2gram.c vocab.c trainingThread.c  ngram_tools.c -o word2vec $(CFLAGS)
+	$(CC) word2gram.c vocab.c trainingThread.c  ngram_tools.c -o word2gram $(CFLAGS)
 word2vec : word2vec.c
 	$(CC) word2vec.c vocab.c trainingThread.c -o word2vec $(CFLAGS)
 word2phrase : word2phrase.c
@@ -22,4 +22,4 @@ compute-accuracy-syntax : compute-accuracy-syntax.c
 	chmod +x *.sh
 
 clean:
-	rm -rf word2vec word2phrase distance word-analogy compute-accuracy compute-accuracy-syntax
+	rm -rf word2vec word2gram word2phrase distance word-analogy compute-accuracy compute-accuracy-syntax

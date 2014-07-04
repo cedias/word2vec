@@ -5,7 +5,7 @@
 void gramVocToWordVec(vocabulary* voc, real* syn0,int max_string, int layer1_size, int ngram, int hashbang,int group_vec, int binary, char* train_file, char* output_file){
 
 	FILE *fin, *fo;
-	char grama[ngram+1];
+	char grama[ngram+3];
 	int hash = 0;
 	char word[max_string];
 	int i,start,end,lenWord,indGram, offset;
@@ -35,7 +35,7 @@ void gramVocToWordVec(vocabulary* voc, real* syn0,int max_string, int layer1_siz
 		if (feof(fin))
 			break;
 
-		ReadWord(word, fin,hashbang);
+		ReadWord(word, fin);
 		hash = GetWordHash(voc,word);
 
 		if (hashset[hash] != -1)
@@ -87,7 +87,7 @@ void gramVocToWordVec(vocabulary* voc, real* syn0,int max_string, int layer1_siz
 		if (feof(fin))
 			break;
 
-		ReadWord(word, fin,hashbang);
+		ReadWordHashbang(word, fin);
 
 		hash = GetWordHash(voc,word);
 
@@ -112,12 +112,17 @@ void gramVocToWordVec(vocabulary* voc, real* syn0,int max_string, int layer1_siz
 			}
 
 			grama[ngram] = '\0';
+			
+			addGramPosition(grama,ngram,start,end,lenWord);
+
 			indGram = SearchVocab(voc,grama);
+			
 
 			if(indGram > -1)
 				offset = indGram * layer1_size;
 			else
 			{
+
 				unexistCpt++;
 				end++;
 				start++;

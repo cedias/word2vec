@@ -99,7 +99,7 @@ void *TrainCBOWModelThread(void *arg) {
 	clock_t now;
 
 	char wordToGram[MAX_STRING];
-	char gram[ngram+1];
+	char gram[ngram+3];
 	int start = 0;
 	int end = ngram-1;
 	int newWord = 1;
@@ -167,6 +167,9 @@ void *TrainCBOWModelThread(void *arg) {
 						gram[i] = wordToGram[start+i];
 					}
 					gram[ngram] = '\0';
+
+
+					addGramPosition(gram,ngram,start,end,wordLength);
 
 
 					word = SearchVocab(voc, gram);
@@ -389,7 +392,7 @@ void *TrainSKIPModelThread(void *arg) {
 	clock_t now;
 
 	char wordToGram[MAX_STRING];
-	char gram[ngram+1];
+	char gram[ngram+3];
 	int start = 0;
 	int end = ngram-1;
 	int newWord = 1;
@@ -458,7 +461,7 @@ void *TrainSKIPModelThread(void *arg) {
 					}
 					gram[ngram] = '\0';
 
-
+					addGramPosition(gram,ngram,start,end,wordLength);
 					word = SearchVocab(voc, gram);
 					
 					end++;
