@@ -13,17 +13,17 @@ struct vocab_word {
 
 typedef struct vocabulary_struct
 {
-	unsigned long long int vocab_hash_size;
+	int vocab_hash_size;
 	unsigned long long int train_words;
-	unsigned long long int vocab_max_size;
-	unsigned long long int vocab_size;
-	unsigned long long int* vocab_hash;
+	long long vocab_max_size;
+	long long vocab_size;
+	int* vocab_hash;
 	struct vocab_word *vocab;
 
 } vocabulary;
 
 /*Inits a vocabulary */
-vocabulary *InitVocabulary(int vocab_hash_size, unsigned long long vocab_max_size);
+vocabulary *InitVocabulary(int vocab_hash_size, int vocab_max_size);
 /*Reads a word from file descriptor fin*/
 void ReadWord(char *word, FILE *fin);
 
@@ -59,10 +59,10 @@ void ReduceVocab(vocabulary* voc,  int min_reduce);
 if not add, if yes, increment. --- REDUCE VOCAB DEACTIVATED */
 void searchAndAddToVocab(vocabulary* voc, char* word);
 
-/*Create a vocab from train file*/
+/*Create a vocab from train file - returns file size*/
 long long LearnVocabFromTrainFile(vocabulary* voc, char* train_file,int min_count);
 
-/*Create a vocab of ngram from train file*/
+/*Create a vocab of ngram from train file returns file size*/
 long long LearnNGramFromTrainFile(vocabulary* voc, char* train_file,int min_count, int ngram, int hashbang, int position);
 
 /*Saves vocab & Occurences*/

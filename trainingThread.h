@@ -49,7 +49,9 @@ threadParameters * CreateParametersStruct(vocabulary* voc,
 	); 
 
 void *TrainCBOWModelThread(void *arg);
+void *TrainCBOWModelThreadGram(void *arg);
 void *TrainSKIPModelThread(void *arg);
+void *TrainSKIPModelThreadGram(void *arg);
 
 
 #endif

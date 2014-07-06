@@ -41,7 +41,7 @@ int EXP_TABLE_SIZE = 1000;
 char train_file[MAX_STRING], output_file[MAX_STRING];
 char save_vocab_file[MAX_STRING], read_vocab_file[MAX_STRING];
 
-int binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 5, num_threads = 1, min_reduce = 1, ngram = 3, hashbang = 0, group_vec = 0;
+int binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 0, num_threads = 1, min_reduce = 1, ngram = 3, hashbang = 1, group_vec = 0;
 int layer1_size = 100;
 
 long long word_count_actual = 0, file_size = 0, classes = 0;
@@ -140,8 +140,7 @@ void InitNet(vocabulary * voc) {
 }
 
 void TrainModel(vocabulary* voc) {
-	long a, b, c, d;
-	FILE *fo;
+	long a;
 	pthread_t *pt = (pthread_t *)malloc(num_threads * sizeof(pthread_t));
 
 	starting_alpha = alpha;
@@ -184,9 +183,9 @@ void TrainModel(vocabulary* voc) {
 		/*NB: The parameters struct are freed by each thread.*/
 
 		if(cbow)
-			pthread_create(&pt[a], NULL, TrainCBOWModelThread, (void *)params);
+			pthread_create(&pt[a], NULL, TrainCBOWModelThreadGram, (void *)params);
 		else
-			pthread_create(&pt[a], NULL, TrainSKIPModelThread, (void *)params);
+			pthread_create(&pt[a], NULL, TrainSKIPModelThreadGram, (void *)params);
 	}
 
 	for (a = 0; a < num_threads; a++)
@@ -218,7 +217,8 @@ int ArgPos(char *str, int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
-	int i,position=0;
+	int i,position=1;
+
 	if (argc == 1) {
 		printf("WORD VECTOR estimation toolkit v 0.1b\n\n");
 		printf("Options:\n");
@@ -241,7 +241,7 @@ int main(int argc, char **argv) {
 		printf("\t-threads <int>\n");
 		printf("\t\tUse <int> threads (default 1)\n");
 		printf("\t-min-count <int>\n");
-		printf("\t\tThis will discard words that appear less than <int> times; default is 5\n");
+		printf("\t\tThis will discard words that appear less than <int> times; default is 0\n");
 		printf("\t-alpha <float>\n");
 		printf("\t\tSet the starting learning rate; default is 0.025\n");
 		printf("\t-binary <int>\n");
@@ -293,15 +293,15 @@ int main(int argc, char **argv) {
 	/**
 	Fixed starting Parameters:
 	**/
-	const unsigned long vocab_hash_size =  3000000;  // Maximum 30 * 0.7 = 21M words in the vocabulary
-	const unsigned long vocab_max_size = 1000;
+	int vocab_hash_size =  3000000;  // Maximum 30 * 0.7 = 21M words in the vocabulary
+	int vocab_max_size = 1000;
 
 
 	//1: init vocabulary
 	vocabulary* vocab = InitVocabulary(vocab_hash_size,vocab_max_size);
 
 	//2: load vocab
-	LearnNGramFromTrainFile(vocab,train_file,min_count,ngram,hashbang,position);
+	file_size = LearnNGramFromTrainFile(vocab,train_file,min_count,ngram,hashbang,position);
 
 	if (output_file[0] == 0) //nowhere to output => quit
 		return 0;

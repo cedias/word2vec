@@ -4,15 +4,15 @@
 #include "vocab.h"
 
 /*Inits a vocabulary*/
-vocabulary* InitVocabulary( int vocab_hash_size, unsigned long long int vocab_max_size){
-	unsigned long long i;
+vocabulary* InitVocabulary(int vocab_hash_size, int vocab_max_size){
+	int i;
 
 	vocabulary* voc = (vocabulary*) malloc(sizeof(vocabulary));
 	if(voc == NULL){
 		printf("vocabulary couldn't be created, memory problem, exiting...\n");
 		exit(1);
 	}
-	voc->vocab_hash = (unsigned long long int *) calloc(vocab_hash_size, sizeof(unsigned long long int));
+	voc->vocab_hash = (int *) calloc(vocab_hash_size, sizeof(int));
 	if(voc == NULL){
 		printf("vocabulary hash couldn't be created, memory problem, exiting...\n");
 		exit(1);
@@ -25,6 +25,7 @@ vocabulary* InitVocabulary( int vocab_hash_size, unsigned long long int vocab_ma
 	voc->vocab_size = 0;
 	voc->vocab_hash_size = vocab_hash_size;
 	voc->vocab_max_size = vocab_max_size;
+	voc->train_words = 0;
 
 	for(i=0;i<voc->vocab_hash_size;i++)
 		voc->vocab_hash[i] = -1;
@@ -130,8 +131,9 @@ void ReadWordHashbang(char *word, FILE *fin) {
 int GetWordHash(vocabulary* voc, char *word) {
 	unsigned long long a, hash = 0;
 
-	for (a = 0; a < strlen(word); a++) 
+	for (a = 0; a < strlen(word); a++){ 
 		hash = hash * 257 + word[a];
+	}
 
 	hash = hash % voc->vocab_hash_size;
 	return hash;
@@ -154,13 +156,15 @@ void DestroyVocab(vocabulary* voc) {
   }
   free(voc->vocab[voc->vocab_size].word);
   free(voc->vocab);
+  free(voc->vocab_hash);
+  free(voc);
 }
 
 /* Returns position of a word in the vocabulary;
  if the word is not found, returns -1*/
 int SearchVocab(vocabulary* voc, char *word) {
-	unsigned int hash = GetWordHash(voc, word);
-
+	int hash = GetWordHash(voc, word);
+	
 	while (1) {
 		if (voc->vocab_hash[hash] == -1)
 			return -1;
@@ -188,7 +192,6 @@ int ReadWordIndex(vocabulary* voc, FILE *fin) {
 /* Adds a word to the vocabulary
 	Returns the vocabulary size */
 int AddWordToVocab(vocabulary* voc, char *word) {
-
 	unsigned int hash, length = strlen(word) + 1;
 
 	if (length > MAX_STRING)
@@ -223,12 +226,12 @@ int VocabCompare(const void *a, const void *b) {
 
 /* Sorts the vocabulary by frequency using word counts*/
 void SortVocab(vocabulary* voc, int min_count) {
-	int a, size;
+	unsigned long long int a,size;
 	unsigned int hash;
 
 	if(DEBUG_MODE > 2)
 		printf("Sorting Vocab...\n");
-
+	
 	// Sort the vocabulary and keep </s> at the first position
 	qsort(&voc->vocab[1], voc->vocab_size - 1, sizeof(struct vocab_word), VocabCompare);
 
@@ -243,7 +246,7 @@ void SortVocab(vocabulary* voc, int min_count) {
 		if (voc->vocab[a].cn < min_count) {
 			voc->vocab_size--;
 			//free(vocab[vocab_size].word); 
-			//free(vocab[a].word);
+			free(voc->vocab[a].word);
 			voc->vocab[a].word = NULL;
 		}
 		else {
@@ -258,8 +261,12 @@ void SortVocab(vocabulary* voc, int min_count) {
 		}
 	}
 
-
 	voc->vocab = (struct vocab_word *)realloc(voc->vocab, (voc->vocab_size + 1) * sizeof(struct vocab_word));
+	if(voc->vocab == NULL)
+	{
+		printf("memory realloc has miserably failed...\n");
+		exit(2);
+	}
 
 	// Allocate memory for the binary tree construction
 	for (a = 0; a < voc->vocab_size; a++) {
@@ -337,17 +344,26 @@ void addGramPosition(char * gram,int ngram, int start,int end,int lenWord){
 
 /*Look if word already in vocab, if not add, if yes, increment. */
 void searchAndAddToVocab(vocabulary* voc, char* word){
-	long long a,i;
+	//printf("searching for \"%s\" in vocab\n",word );
+	int a,i;
 	i = SearchVocab(voc, word);
 
 		if (i == -1) {
+			//printf("wasn't there, adding \"%s\" to vocab\n",word );
 			a = AddWordToVocab(voc, word);
 			voc->vocab[a].cn = 1;
 		} else
+			//printf("was there, increment its cn value \"%s\" => %lld to vocab\n",word,voc->vocab[i].cn+1);
 			voc->vocab[i].cn++;
 
 		if (voc->vocab_size > voc->vocab_hash_size * 0.7)
 			ReduceVocab(voc,0);  //////////////////CAUTION
+
+
+		i = SearchVocab(voc, word);
+		if(i== -1){
+			//printf("%s wasn't properly imported, dafuq? \n", word);
+		} 
 }
 
 /*Create a vocab from train file*/

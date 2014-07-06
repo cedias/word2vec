@@ -384,17 +384,17 @@ int main(int argc, char **argv) {
 	/**
 	Fixed starting Parameters:
 	**/
-	const int vocab_hash_size =  30000000;  // Maximum 30 * 0.7 = 21M words in the vocabulary
-	const int vocab_max_size = 1000;
+	int vocab_hash_size =  30000000;  // Maximum 30 * 0.7 = 21M words in the vocabulary
+	int vocab_max_size = 1000;
 
 	//1: init vocabulary
 	vocabulary* vocab = InitVocabulary(vocab_hash_size,vocab_max_size);
 
 	//2: load vocab
 	if (read_vocab_file[0] != 0)
-		ReadVocab(vocab,read_vocab_file,train_file,min_count);
+		file_size = ReadVocab(vocab,read_vocab_file,train_file,min_count);
 	else
-		LearnVocabFromTrainFile(vocab,train_file,min_count);
+		file_size = LearnVocabFromTrainFile(vocab,train_file,min_count);
 
 	if (save_vocab_file[0] != 0)
 		SaveVocab(vocab,save_vocab_file);

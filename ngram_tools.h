@@ -1,5 +1,5 @@
-#ifndef TRAIN_THREADS
-#define TRAIN_THREADS
+#ifndef NGRAMTOOLS
+#define NGRAMTOOLS
 #define DEBUG_MODE 2
 
 typedef float real;

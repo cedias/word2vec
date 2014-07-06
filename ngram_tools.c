@@ -8,9 +8,10 @@ void gramVocToWordVec(vocabulary* voc, real* syn0,int max_string, int layer1_siz
 	char grama[ngram+3];
 	int hash = 0;
 	char word[max_string];
-	int i,start,end,lenWord,indGram, offset;
+	int i,start,end,lenWord, offset;
 	int *hashset;
 	long long unsigned int cptWord=0;
+	unsigned long long int indGram;
 	int skipCpt=0;
 	int unexistCpt=0;
 	int gramCpt=0;
@@ -105,16 +106,13 @@ void gramVocToWordVec(vocabulary* voc, real* syn0,int max_string, int layer1_siz
 
 		while(end<lenWord)
 		{
-
 			for (i = 0; i < ngram; i++)
 			{
 				grama[i] = word[start+i];
 			}
 
 			grama[ngram] = '\0';
-			
 			addGramPosition(grama,ngram,start,end,lenWord);
-
 			indGram = SearchVocab(voc,grama);
 			
 
@@ -122,12 +120,12 @@ void gramVocToWordVec(vocabulary* voc, real* syn0,int max_string, int layer1_siz
 				offset = indGram * layer1_size;
 			else
 			{
-
 				unexistCpt++;
 				end++;
 				start++;
 				continue;
 			}
+			
 			switch(group_vec){
 				case 0:
 				case 1:
