@@ -1,6 +1,6 @@
 CC = gcc
 #The -Ofast might not work with older versions of gcc; in that case, use -O2
-CFLAGS = -lm -pthread -march=native -Wall  -Wno-unused-result -funroll-loops -g
+CFLAGS = -lm -pthread -march=native -Wall  -Wno-unused-result -funroll-loops -Ofast
 #
 
 all: word2gram word2vec word2phrase distance word-analogy compute-accuracy compute-accuracy-syntax cleano

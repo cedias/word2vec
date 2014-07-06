@@ -41,7 +41,7 @@ int EXP_TABLE_SIZE = 1000;
 char train_file[MAX_STRING], output_file[MAX_STRING];
 char save_vocab_file[MAX_STRING], read_vocab_file[MAX_STRING];
 
-int binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 0, num_threads = 1, min_reduce = 1, ngram = 3, hashbang = 1, group_vec = 0;
+int binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 0, num_threads = 1, min_reduce = 0, ngram = 3, hashbang = 1, group_vec = 0;
 int layer1_size = 100;
 
 long long word_count_actual = 0, file_size = 0, classes = 0;
