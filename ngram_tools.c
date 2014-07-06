@@ -11,7 +11,7 @@ void gramVocToWordVec(vocabulary* voc, real* syn0,int max_string, int layer1_siz
 	int i,start,end,lenWord, offset;
 	int *hashset;
 	long long unsigned int cptWord=0;
-	unsigned long long int indGram;
+	long long int indGram;
 	int skipCpt=0;
 	int unexistCpt=0;
 	int gramCpt=0;
@@ -88,7 +88,10 @@ void gramVocToWordVec(vocabulary* voc, real* syn0,int max_string, int layer1_siz
 		if (feof(fin))
 			break;
 
-		ReadWordHashbang(word, fin);
+		if (hashbang)
+			ReadWordHashbang(word, fin);
+		else
+			ReadWord(word,fin);
 
 		hash = GetWordHash(voc,word);
 
@@ -115,11 +118,11 @@ void gramVocToWordVec(vocabulary* voc, real* syn0,int max_string, int layer1_siz
 			addGramPosition(grama,ngram,start,end,lenWord);
 			indGram = SearchVocab(voc,grama);
 			
-
 			if(indGram > -1)
 				offset = indGram * layer1_size;
 			else
 			{
+				printf("not in dic: %s\n",grama );
 				unexistCpt++;
 				end++;
 				start++;
