@@ -6,11 +6,11 @@ CFLAGS = -lm -pthread -march=native -Wall  -Wno-unused-result -funroll-loops -Of
 all: word2gram word2vec word2phrase distance word-analogy compute-accuracy compute-accuracy-syntax cleano
 
 vocab.o : vocab.c vocab.h
-	$(CC) -c vocab.c
+	$(CC) -c vocab.c $(CFLAGS)
 ngram_tools.o : ngram_tools.c ngram_tools.h
-	$(CC) -c ngram_tools.c
-trainingThread.o : trainingThread.c trainingThread.h
-	$(CC) -c trainingThread.c
+	$(CC) -c ngram_tools.c $(CFLAGS)
+trainingThread.o : trainingThread.c trainingThread.h 
+	$(CC) -c trainingThread.c $(CFLAGS)
 word2gram : word2gram.c vocab.o ngram_tools.o trainingThread.o
 	$(CC) word2gram.c vocab.o ngram_tools.o trainingThread.o -o word2gram $(CFLAGS)
 word2vec : word2vec.c vocab.o ngram_tools.o trainingThread.o
