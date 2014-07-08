@@ -42,7 +42,7 @@ char train_file[MAX_STRING], output_file[MAX_STRING];
 char save_vocab_file[MAX_STRING], read_vocab_file[MAX_STRING];
 
 int binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 0, num_threads = 1, min_reduce = 0, ngram = 3, hashbang = 1, group_vec = 0;
-int layer1_size = 100;
+int layer1_size = 100, position = 1;
 
 long long word_count_actual = 0, file_size = 0, classes = 0;
 
@@ -177,6 +177,7 @@ void TrainModel(vocabulary* voc) {
 			hs,
 			negative,
 			table_size,
+			position,
 			train_file
 			);
 
@@ -217,7 +218,7 @@ int ArgPos(char *str, int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
-	int i,position=1;
+	int i;
 
 	if (argc == 1) {
 		printf("WORD VECTOR estimation toolkit v 0.1b\n\n");
@@ -253,8 +254,8 @@ int main(int argc, char **argv) {
 		printf("\t-hashbang <0-1> (default 0)\n");
 		printf("\t\tUse hashbang on n-grams - i.e #good# -> #go,goo,ood,od#\n");
 		printf("\t-group <0-5> (default 0)\n");
-		printf("\t\tHow word vectors are computed with n-grams - 0:Mean (default); 1:Sum; 2:Min; 3:Max; 4:Trunc; 5:FreqSum\n");
-		printf("\t-pos <0-1> (default 0)\n");
+		printf("\t\tHow word vectors are computed with n-grams - 0:Sum (default); 1:Mean; 2:Min; 3:Max; 4:Trunc; 5:FreqSum\n");
+		printf("\t-pos <0-1-2> (default 0) - 1: #good# -> #g go- -oo- -od d# 2: -> #g 01-go 02-oo 03-od d# \n");
 		printf("\t\tAdds position indication to ngrams\n");
 		
 		printf("\nExamples:\n");
@@ -311,7 +312,7 @@ int main(int argc, char **argv) {
 	
 	//4: make word vectors
 	printf("Creating word vectors.\n");
-	gramVocToWordVec(vocab,syn0,MAX_STRING,layer1_size,ngram,hashbang,group_vec,binary,train_file,output_file);
+	gramVocToWordVec(vocab,syn0,MAX_STRING,layer1_size,ngram,hashbang,group_vec,binary,position,train_file,output_file);
 
 	free(expTable);
 	DestroyNet();

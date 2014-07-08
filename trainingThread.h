@@ -17,7 +17,7 @@ typedef struct threadParameters_struct {
     vocabulary *voc;
     real *syn0 , *syn1, *syn1neg, *expTable, *alpha,starting_alpha;
     real sample; 
-    int threadNumber,num_threads,hs,negative,file_size,max_string,exp_table_size,ngram,max_exp,window, layer1_size,table_size;
+    int threadNumber,num_threads,hs,negative,file_size,max_string,exp_table_size,ngram,max_exp,window, layer1_size,table_size,position;
     int *table;
     long long int *word_count_actual;
     char* train_file;
@@ -45,6 +45,7 @@ threadParameters * CreateParametersStruct(vocabulary* voc,
 	int hs,
 	int negative,
 	int table_size,
+	int position,
 	char* train_file
 	); 
 

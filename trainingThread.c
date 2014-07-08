@@ -23,6 +23,7 @@ threadParameters * CreateParametersStruct(vocabulary* voc,
 	int hs,
 	int negative,
 	int table_size,
+	int position,
 	char* train_file){
 
 	threadParameters * params = (threadParameters*)malloc(sizeof(threadParameters));
@@ -48,6 +49,7 @@ threadParameters * CreateParametersStruct(vocabulary* voc,
 	params->max_exp = max_exp;
 	params->hs = hs;
 	params->negative = negative;
+	params->position = position;
 	params->table_size = table_size;
 	params->train_file = train_file;
 
@@ -62,9 +64,7 @@ void *TrainCBOWModelThread(void *arg) {
 
 	vocabulary *voc = params->voc;	 //shared
 	int id = params->threadNumber;
-	int MAX_STRING = params->max_string;
 	int MAX_EXP = params->max_exp;
-	int ngram = params->ngram;
 	int layer1_size = params->layer1_size;
 	int num_threads = params->num_threads;
 	int file_size = params->file_size;
@@ -84,26 +84,16 @@ void *TrainCBOWModelThread(void *arg) {
 	real *syn1neg = params->syn1neg;	 //shared
 	real *expTable = params->expTable;	 //shared
 
-	free(arg);
+	free(arg); //arg is not needed anymore
 
-
-
-
-	long long a, b, d, i, word, last_word, sentence_length = 0, sentence_position = 0;
+	long long a, b, d, word, last_word, sentence_length = 0, sentence_position = 0;
 	long long word_count = 0, last_word_count = 0, sen[MAX_SENTENCE_LENGTH + 1];
 	long long  l2, c, target, label;
 	unsigned long long next_random = (long long)id;
-	
 
 	real f, g;
 	clock_t now;
-
-	char wordToGram[MAX_STRING];
-	char gram[ngram+3];
 	int start = 0;
-	int end = ngram-1;
-	int newWord = 1;
-	int wordLength = 0;
 
 	real *neu1 = (real *)calloc(layer1_size, sizeof(real)); //one vector
 	real *neu1e = (real *)calloc(layer1_size, sizeof(real)); 
@@ -322,6 +312,7 @@ void *TrainCBOWModelThreadGram(void *arg) {
 	int negative = params->negative;
 	int EXP_TABLE_SIZE = params->exp_table_size;
 	int table_size = params->table_size;
+	int position = params->position;
 	long long int *word_count_actual = params->word_count_actual; //shared
 	int *table = params->table;
 	char *train_file = params->train_file;
@@ -410,8 +401,9 @@ void *TrainCBOWModelThreadGram(void *arg) {
 				}
 				gram[ngram] = '\0';
 
+				if(position)
+					addGramPosition(gram,ngram,start,end,wordLength,position);
 
-				addGramPosition(gram,ngram,start,end,wordLength);
 				word = SearchVocab(voc, gram);
 				
 				end++;
@@ -589,7 +581,6 @@ void *TrainSKIPModelThread(void *arg) {
 
 	vocabulary *voc = params->voc;	 //shared
 	int id = params->threadNumber;
-	int MAX_STRING = params->max_string;
 	int MAX_EXP = params->max_exp;
 	int layer1_size = params->layer1_size;
 	int num_threads = params->num_threads;
@@ -613,7 +604,7 @@ void *TrainSKIPModelThread(void *arg) {
 	free(arg);
 
 
-	long long a, b, d, i, word, last_word, sentence_length = 0, sentence_position = 0;
+	long long a, b, d, word, last_word, sentence_length = 0, sentence_position = 0;
 	long long word_count = 0, last_word_count = 0, sen[MAX_SENTENCE_LENGTH + 1];
 	long long l1, l2, c, target, label;
 	unsigned long long next_random = (long long)id;
@@ -825,6 +816,7 @@ void *TrainSKIPModelThreadGram(void *arg) {
 	int window = params->window;
 	int hs = params->hs;
 	int negative = params->negative;
+	int position = params->position;
 	int EXP_TABLE_SIZE = params->exp_table_size;
 	int table_size = params->table_size;
 	long long int *word_count_actual = params->word_count_actual; //shared
@@ -914,7 +906,9 @@ void *TrainSKIPModelThreadGram(void *arg) {
 				}
 				gram[ngram] = '\0';
 
-				addGramPosition(gram,ngram,start,end,wordLength);
+				if(position)
+					addGramPosition(gram,ngram,start,end,wordLength,position);
+
 				word = SearchVocab(voc, gram);
 				
 				end++;

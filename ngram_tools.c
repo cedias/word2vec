@@ -2,7 +2,7 @@
 #include "ngram_tools.h"
 
 
-void gramVocToWordVec(vocabulary* voc, real* syn0,int max_string, int layer1_size, int ngram, int hashbang,int group_vec, int binary, char* train_file, char* output_file){
+void gramVocToWordVec(vocabulary* voc, real* syn0,int max_string, int layer1_size, int ngram, int hashbang,int group_vec, int binary,int position, char* train_file, char* output_file){
 
 	FILE *fin, *fo;
 	char grama[ngram+3];
@@ -115,14 +115,16 @@ void gramVocToWordVec(vocabulary* voc, real* syn0,int max_string, int layer1_siz
 			}
 
 			grama[ngram] = '\0';
-			addGramPosition(grama,ngram,start,end,lenWord);
+
+			if(position)
+				addGramPosition(grama,ngram,start,end,lenWord,position);
+
 			indGram = SearchVocab(voc,grama);
 			
 			if(indGram > -1)
 				offset = indGram * layer1_size;
 			else
 			{
-				printf("not in dic: %s\n",grama );
 				unexistCpt++;
 				end++;
 				start++;
@@ -152,13 +154,17 @@ void gramVocToWordVec(vocabulary* voc, real* syn0,int max_string, int layer1_siz
 			start++;
 		}
 
-		if(group_vec==0 || group_vec==5) //Mean
-		{
-			//normalization
+		if(group_vec==1){
 			for(i=0;i<layer1_size;i++){
-					wordVec[i] /= gramCpt;
+				wordVec[i] /= 2;
 			}
 		}
+
+		//normalization
+		for(i=0;i<layer1_size;i++){
+				wordVec[i] /= gramCpt;
+		}
+		
 		hashset[hash] = 1;		
 		gramCpt = 0;
 

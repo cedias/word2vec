@@ -2,6 +2,8 @@
 #define MAX_SENTENCE_LENGTH 1000
 #define MAX_CODE_LENGTH 40
 #include "vocab.h"
+#include <string.h>
+
 
 /*Inits a vocabulary*/
 vocabulary* InitVocabulary(int vocab_hash_size, int vocab_max_size){
@@ -312,33 +314,60 @@ void ReduceVocab(vocabulary* voc, int min_reduce) {
 }
 
 /* Adds position to gram Ngram - gram tab size is ngram+3 index: [0->ngram+2]*/
-void addGramPosition(char * gram,int ngram, int start,int end,int lenWord){
+void addGramPosition(char * gram,int ngram, int start,int end,int lenWord,int type){
 	int i;
+	char num[3];
+
 	if(gram[0]=='#' || gram[ngram-1]=='#')
-		return;
+			return;
 
-	if(start==1)
-	{
-		gram[ngram]='-';
-		gram[ngram+1]='\0'; 
-		return;
-	}
+	if(type==1){
+		/*	Adds '-'  */
 
-	if(end == lenWord-2){
+		if(start==1)
+		{
+			gram[ngram]='-';
+			gram[ngram+1]='\0'; 
+			return;
+		}
+
+		if(end == lenWord-2){
+			for(i=ngram+1;i>0;i--){
+				gram[i]=gram[i-1];
+			}
+			gram[0]='-';
+			return;
+		}
+
 		for(i=ngram+1;i>0;i--){
 			gram[i]=gram[i-1];
 		}
-		gram[0]='-';
-		return;
+			gram[0]='-';
+			gram[ngram+1]='-';
+			gram[ngram+2]='\0';
 	}
+	else
+	{
+		/* adds #start- /!\ start must be <= 99 */
 
-	for(i=ngram+1;i>0;i--){
-			gram[i]=gram[i-1];
+
+		for(i=ngram+3;i>=3;i--)
+		{
+			gram[i]=gram[i-3];
 		}
-		gram[0]='-';
-		gram[ngram+1]='-';
-		gram[ngram+2]='\0';
+		
+		sprintf(num,"%d",start);
+		if(start>=10){
+			gram[0] = num[0];	
+			gram[1] = num[1];
+		}else{
+			gram[0] = '0';
+			gram[1] = num[0];
+		}
+		gram[2] = '-';
 
+	}
+	
 	return;
 }
 
@@ -419,7 +448,7 @@ long long LearnNGramFromTrainFile(vocabulary* voc, char* train_file,int min_coun
 	int i,start,end,lenWord;
 	FILE * fin;
 	
-	char gram[ngram+3]; //one for '\0, 2 for position'
+	char gram[ngram+4]; //one for '\0, 3 for position'
 
 	for (i = 0; i < voc->vocab_hash_size; i++) //init vocab hashtable
 		voc->vocab_hash[i] = -1;
@@ -466,8 +495,8 @@ long long LearnNGramFromTrainFile(vocabulary* voc, char* train_file,int min_coun
 			gram[ngram] = '\0';
 
 			
-			if(position)
-				addGramPosition(gram,ngram,start,end,lenWord);
+			if(position > 0)
+				addGramPosition(gram,ngram,start,end,lenWord,position);
 
 			searchAndAddToVocab(voc,gram);
 			

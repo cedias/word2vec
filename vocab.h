@@ -75,6 +75,6 @@ long long ReadVocab(vocabulary* voc, char* read_vocab_file, char* train_file, in
  Frequent words will have short uniqe binary codes*/
 void CreateBinaryTree(vocabulary* voc);
 
-void addGramPosition(char * gram,int ngram , int start,int end,int lenWord);
+void addGramPosition(char * gram,int ngram , int start,int end,int lenWord,int type);
 
 #endif
