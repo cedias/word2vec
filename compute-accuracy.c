@@ -38,13 +38,18 @@ int main(int argc, char **argv)
     return 0;
   }
 
+
   strcpy(file_name, argv[1]);
 
   if (argc > 2)
     threshold = atoi(argv[2]);
 
-  if (argc > 3)
+  if (argc > 3){
     small_print = 1; //output is smaller
+    printf("####### START #######\n");
+    printf("VEC: %s\n",file_name );
+  }
+
 
   f = fopen(file_name, "rb");
 
@@ -256,5 +261,8 @@ int main(int argc, char **argv)
   }
   
   printf("Questions seen / total: %d %d   %.2f %% \n", TQS, TQ, TQS/(float)TQ*100);
+
+  if(small_print)
+   printf("####### END #######\n\n");
   return 0;
 }
