@@ -7,7 +7,7 @@ except:
     exit()
 
 fin = open(filename, "r")
-fout = open(filename, "w")
+fout = open("clean.txt", "w")
 
 for line in fin:
     print "hello"
