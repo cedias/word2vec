@@ -41,7 +41,7 @@ int EXP_TABLE_SIZE = 1000;
 char train_file[MAX_STRING], output_file[MAX_STRING];
 char save_vocab_file[MAX_STRING], read_vocab_file[MAX_STRING];
 
-int binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 0, num_threads = 1, min_reduce = 0, ngram = 3, hashbang = 1, group_vec = 0;
+int words = 1, binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 0, num_threads = 1, min_reduce = 0, ngram = 3, hashbang = 1, group_vec = 0;
 int layer1_size = 100, position = 1;
 
 long long word_count_actual = 0, file_size = 0, classes = 0;
@@ -257,6 +257,8 @@ int main(int argc, char **argv) {
 		printf("\t\tHow word vectors are computed with n-grams - 0:Sum (default); 1:Mean; 2:Min; 3:Max; 4:Trunc; 5:FreqSum\n");
 		printf("\t-pos <0-1-2> (default 0) - 1: #good# -> #g go- -oo- -od d# 2: -> #g 01-go 02-oo 03-od d# \n");
 		printf("\t\tAdds position indication to ngrams\n");
+		printf("\t-words <0-1> (default 1) \n");
+		printf("\t\tproduce word vector with words from training file\n");
 		
 		printf("\nExamples:\n");
 		printf("./word2vec -train data.txt -output vec.txt -debug 2 -size 200 -window 5 -sample 1e-4 -negative 5 -hs 0 -binary 0 -cbow 1\n\n");
@@ -283,6 +285,7 @@ int main(int argc, char **argv) {
 	if ((i = ArgPos ((char *) "-hashbang", argc, argv)) > 0 ) hashbang = atoi(argv[i + 1]);
 	if ((i = ArgPos ((char *) "-group", argc, argv)) > 0 ) group_vec = atoi(argv[i + 1]);
 	if ((i = ArgPos ((char *) "-pos", argc, argv)) > 0 ) position = atoi(argv[i + 1]);
+	if ((i = ArgPos ((char *) "-words", argc, argv)) > 0 ) words = atoi(argv[i + 1]);
 	
 	expTable = (real *)malloc((EXP_TABLE_SIZE + 1) * sizeof(real));
 
@@ -312,7 +315,10 @@ int main(int argc, char **argv) {
 	
 	//4: make word vectors
 	printf("Creating word vectors.\n");
-	gramVocToWordVec(vocab,syn0,MAX_STRING,layer1_size,ngram,hashbang,group_vec,binary,position,train_file,output_file);
+	if(words)
+		gramVocToWordVec(vocab,syn0,MAX_STRING,layer1_size,ngram,hashbang,group_vec,binary,position,train_file,output_file);
+	else
+		writeGrams(vocab,syn0,layer1_size,ngram,hashbang,position,output_file,binary);
 
 	free(expTable);
 	DestroyNet();
