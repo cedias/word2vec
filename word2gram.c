@@ -297,7 +297,7 @@ int main(int argc, char **argv) {
 	/**
 	Fixed starting Parameters:
 	**/
-	int vocab_hash_size =  3000000;  // Maximum 30 * 0.7 = 21M words in the vocabulary
+	int vocab_hash_size =  10000000;  // Maximum 30 * 0.7 = 21M words in the vocabulary
 	int vocab_max_size = 1000;
 
 
