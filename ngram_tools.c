@@ -10,16 +10,14 @@ void writeGrams(vocabulary* voc,real *syn0,int layer1_size,int ngram,int hashban
 	fprintf(fo, "%lld %d %d %d %d\n", voc->vocab_size, layer1_size, ngram, hashbang, position);
 	for (a = 0; a < voc->vocab_size; a++) {
 		fprintf(fo, "%s ", voc->vocab[a].word);
-		printf("%s\n", voc->vocab[a].word );
-		printf("[" );
+
 		if (binary)
 			for (b = 0; b < layer1_size; b++)
 				fwrite(&syn0[a * layer1_size + b], sizeof(real), 1, fo);
 		else
-			for (b = 0; b < layer1_size; b++){
+			for (b = 0; b < layer1_size; b++)
 				fprintf(fo, "%lf ", syn0[a * layer1_size + b]);
-				printf("%lf, ", syn0[a * layer1_size + b]);			}
-		printf("]\n");
+
 		fprintf(fo, "\n");
 	}
 
