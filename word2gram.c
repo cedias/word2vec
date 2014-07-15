@@ -41,7 +41,7 @@ int EXP_TABLE_SIZE = 1000;
 char train_file[MAX_STRING], output_file[MAX_STRING];
 char save_vocab_file[MAX_STRING], read_vocab_file[MAX_STRING];
 
-int words = 1, binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 0, num_threads = 1, min_reduce = 0, ngram = 3, hashbang = 1, group_vec = 0;
+int words = 1, binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 0, num_threads = 1, min_reduce = 0, ngram = 3, hashbang = 1, group_vec = 0, overlap = 1;
 int layer1_size = 100, position = 1;
 
 long long word_count_actual = 0, file_size = 0, classes = 0;
@@ -178,6 +178,8 @@ void TrainModel(vocabulary* voc) {
 			negative,
 			table_size,
 			position,
+			overlap,
+			hashbang,
 			train_file
 			);
 
@@ -301,11 +303,58 @@ int main(int argc, char **argv) {
 	int vocab_max_size = 1000;
 
 
+
+
+	//TEST
+	char grams[7];
+	char *word = "salut";
+	int indexG = 0;
+	int res;
+	hashbang = 0;
+	indexG = 0;
+	while( (res = getGrams(word, grams, indexG,3,0,0,hashbang))){
+
+		printf("index: %d Gram: %s\n",indexG, grams);
+		indexG++;
+	}
+	indexG = 0;
+	while( (res = getGrams(word, grams, indexG,3,0,1,hashbang))){
+
+		printf("index: %d Gram: %s\n",indexG, grams);
+		indexG++;
+	}
+	indexG = 0;
+	while( (res = getGrams(word, grams, indexG,3,1,0,hashbang))){
+
+		printf("index: %d Gram: %s\n",indexG, grams);
+		indexG++;
+	}
+	indexG = 0;
+	while( (res = getGrams(word, grams, indexG,3,1,1,hashbang))){
+
+		printf("index: %d Gram: %s\n",indexG, grams);
+		indexG++;
+	}
+	indexG = 0;
+	while( (res = getGrams(word, grams, indexG,3,1,2,hashbang))){
+
+		printf("index: %d Gram: %s\n",indexG, grams);
+		indexG++;
+	}
+	indexG = 0;
+	while( (res = getGrams(word, grams, indexG,3,0,2,hashbang))){
+
+		printf("index: %d Gram: %s\n",indexG, grams);
+		indexG++;
+	}
+
+	exit(0);
+
 	//1: init vocabulary
 	vocabulary* vocab = InitVocabulary(vocab_hash_size,vocab_max_size);
 
 	//2: load vocab
-	file_size = LearnNGramFromTrainFile(vocab,train_file,min_count,ngram,hashbang,position);
+	file_size = LearnNGramFromTrainFile(vocab,train_file,min_count,ngram,hashbang,position,overlap);
 
 	if (output_file[0] == 0) //nowhere to output => quit
 		return 0;
@@ -316,7 +365,7 @@ int main(int argc, char **argv) {
 	//4: make word vectors
 	printf("Creating word vectors.\n");
 	if(words)
-		gramVocToWordVec(vocab,syn0,MAX_STRING,layer1_size,ngram,hashbang,group_vec,binary,position,train_file,output_file);
+		gramVocToWordVec(vocab,syn0,MAX_STRING,layer1_size,ngram,hashbang,group_vec,binary,position,overlap,train_file,output_file);
 	else
 		writeGrams(vocab,syn0,layer1_size,ngram,hashbang,position,output_file,binary);
 

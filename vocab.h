@@ -63,7 +63,7 @@ void searchAndAddToVocab(vocabulary* voc, char* word);
 long long LearnVocabFromTrainFile(vocabulary* voc, char* train_file,int min_count);
 
 /*Create a vocab of ngram from train file returns file size*/
-long long LearnNGramFromTrainFile(vocabulary* voc, char* train_file,int min_count, int ngram, int hashbang, int position);
+long long LearnNGramFromTrainFile(vocabulary* voc, char* train_file,int min_count, int ngram, int hashbang, int position, int overlap);
 
 /*Saves vocab & Occurences*/
 void SaveVocab(vocabulary* voc, char* save_vocab_file);
@@ -75,6 +75,6 @@ long long ReadVocab(vocabulary* voc, char* read_vocab_file, char* train_file, in
  Frequent words will have short uniqe binary codes*/
 void CreateBinaryTree(vocabulary* voc);
 
-void addGramPosition(char * gram,int ngram , int start,int end,int lenWord,int type);
+
 
 #endif

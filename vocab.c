@@ -2,6 +2,7 @@
 #define MAX_SENTENCE_LENGTH 1000
 #define MAX_CODE_LENGTH 40
 #include "vocab.h"
+#include "ngram_tools.h"
 #include <string.h>
 
 
@@ -313,63 +314,7 @@ void ReduceVocab(vocabulary* voc, int min_reduce) {
 	min_reduce++;
 }
 
-/* Adds position to gram Ngram - gram tab size is ngram+3 index: [0->ngram+2]*/
-void addGramPosition(char * gram,int ngram, int start,int end,int lenWord,int type){
-	int i;
-	char num[3];
 
-	if(gram[0]=='#' || gram[ngram-1]=='#')
-			return;
-
-	if(type==1){
-		/*	Adds '-'  */
-
-		if(start==1)
-		{
-			gram[ngram]='-';
-			gram[ngram+1]='\0'; 
-			return;
-		}
-
-		if(end == lenWord-2){
-			for(i=ngram+1;i>0;i--){
-				gram[i]=gram[i-1];
-			}
-			gram[0]='-';
-			return;
-		}
-
-		for(i=ngram+1;i>0;i--){
-			gram[i]=gram[i-1];
-		}
-			gram[0]='-';
-			gram[ngram+1]='-';
-			gram[ngram+2]='\0';
-	}
-	else
-	{
-		/* adds #start- /!\ start must be <= 99 */
-
-
-		for(i=ngram+3;i>=3;i--)
-		{
-			gram[i]=gram[i-3];
-		}
-		
-		sprintf(num,"%d",start);
-		if(start>=10){
-			gram[0] = num[0];	
-			gram[1] = num[1];
-		}else{
-			gram[0] = '0';
-			gram[1] = num[0];
-		}
-		gram[2] = '-';
-
-	}
-	
-	return;
-}
 
 /*Look if word already in vocab, if not add, if yes, increment. */
 void searchAndAddToVocab(vocabulary* voc, char* word){
@@ -443,9 +388,9 @@ long long LearnVocabFromTrainFile(vocabulary* voc, char* train_file,int min_coun
 }
 
 /*Create a vocab of ngram from train file*/
-long long LearnNGramFromTrainFile(vocabulary* voc, char* train_file,int min_count, int ngram, int hashbang, int position) {
+long long LearnNGramFromTrainFile(vocabulary* voc, char* train_file,int min_count, int ngram, int hashbang, int position, int overlap) {
 	char word[MAX_STRING];
-	int i,start,end,lenWord;
+	int i,lenWord;
 	FILE * fin;
 	
 	char gram[ngram+4]; //one for '\0, 3 for position'
@@ -481,27 +426,12 @@ long long LearnNGramFromTrainFile(vocabulary* voc, char* train_file,int min_coun
 				continue;
 		}
 
-		start = 0;
-		end = ngram-1;
+
 		i=0;
 		
-		while(end<lenWord)
-		{
-
-			for (i = 0; i < ngram; i++)
-			{
-				gram[i] = word[start+i];
-			}
-			gram[ngram] = '\0';
-
-			
-			if(position > 0)
-				addGramPosition(gram,ngram,start,end,lenWord,position);
-
+		while(getGrams(word,gram,i, ngram, overlap, position,hashbang)){
 			searchAndAddToVocab(voc,gram);
-			
-			end++;
-			start++;
+			i++;
 		}
 
 		if (feof(fin))

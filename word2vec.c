@@ -179,6 +179,8 @@ void TrainModel(vocabulary* voc) {
 			negative,
 			table_size,
 			0,
+			0,
+			0,
 			train_file
 			);
 
