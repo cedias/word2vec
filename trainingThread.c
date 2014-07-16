@@ -383,6 +383,9 @@ void *TrainCBOWModelThreadGram(void *arg) {
 			end = 0;
 
 			while (1) {
+
+
+
 				if (feof(fi))
 					break;	
 
@@ -402,10 +405,14 @@ void *TrainCBOWModelThreadGram(void *arg) {
 					word = SearchVocab(voc, gram);	
 
 				word_count++;
+				i += 1;
 
 				if(end == 0){
 					continue;
 				}
+
+				if (end == -1)
+					end = 0;
 
 				if (word == -1)
 					continue;		
@@ -427,6 +434,7 @@ void *TrainCBOWModelThreadGram(void *arg) {
 
 				if (sentence_length >= MAX_SENTENCE_LENGTH)
 					break;
+
 			}
 			
 			sentence_position = 0;
@@ -896,10 +904,14 @@ void *TrainSKIPModelThreadGram(void *arg) {
 					word = SearchVocab(voc, gram);	
 
 				word_count++;
+				i += 1;
 
 				if(end == 0){
 					continue;
 				}
+
+				if (end == -1)
+					end = 0;
 
 				if (word == -1)
 					continue;
@@ -921,6 +933,8 @@ void *TrainSKIPModelThreadGram(void *arg) {
 
 				if (sentence_length >= MAX_SENTENCE_LENGTH)
 					break;
+
+				
 			}
 			
 			sentence_position = 0;

@@ -331,7 +331,7 @@ void searchAndAddToVocab(vocabulary* voc, char* word){
 			voc->vocab[i].cn++;
 
 		if (voc->vocab_size > voc->vocab_hash_size * 0.7)
-			ReduceVocab(voc,0);  //////////////////CAUTION
+			ReduceVocab(voc,1);  //////////////////CAUTION FIXED PARAMETER
 
 
 		i = SearchVocab(voc, word);
@@ -393,7 +393,7 @@ long long LearnNGramFromTrainFile(vocabulary* voc, char* train_file,int min_coun
 	int i,lenWord;
 	FILE * fin;
 	
-	char gram[ngram+4]; //one for '\0, 3 for position'
+	char gram[ngram*2+4]; //possibility to merge a ngram with another one < ngram size + position (3 tokens) + '\0'
 
 	for (i = 0; i < voc->vocab_hash_size; i++) //init vocab hashtable
 		voc->vocab_hash[i] = -1;

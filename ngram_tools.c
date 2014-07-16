@@ -89,7 +89,7 @@ void gramVocToWordVec(vocabulary* voc, real* syn0,int max_string, int layer1_siz
 
 	for(i=0;i<layer1_size;i++)
 	{
-		wordVec[i] = 0; //syn0[offset+i];
+		wordVec[i] = syn0[i]; //"</s> is always 0"
 	}
 	
 	fprintf(fo, "</s> ");
@@ -100,6 +100,9 @@ void gramVocToWordVec(vocabulary* voc, real* syn0,int max_string, int layer1_siz
 			fprintf(fo, "%lf ", wordVec[i]);
 	}
 	fprintf(fo, "\n");
+
+	hash = GetWordHash(voc,"</s>");
+	hashset[hash] = 1;
 	
 	cptWord=1;
 
@@ -127,58 +130,77 @@ void gramVocToWordVec(vocabulary* voc, real* syn0,int max_string, int layer1_siz
 			continue;
 		}
 
-		while(getGrams(word,grama,gramCpt, ngram, overlap, position,hashbang))
-		{
 
-			indGram = SearchVocab(voc,grama);
-			
-			if(indGram > -1)
-				offset = indGram * layer1_size;
-			else
+		if(lenWord > ngram){
+			while(getGrams(word,grama,gramCpt, ngram, overlap, position,hashbang))
 			{
-				unexistCpt++;
-				continue;
+				
+				indGram = SearchVocab(voc,grama);
+				//printf("word:%s, gram:%s, ind:%lld\n",word,grama,indGram );
+				if(indGram > -1)
+					offset = indGram * layer1_size;
+				else
+				{
+					unexistCpt++;
+					gramCpt += 1;
+					continue;
+				}
+				
+				switch(group_vec){
+					case 0:
+					case 1:
+						sumGram(syn0, layer1_size, offset,wordVec);
+						break;
+					case 2:
+						minmaxGram(syn0, layer1_size,offset,wordVec,1);
+						break;
+					case 3:
+						minmaxGram(syn0, layer1_size,offset,wordVec,0);
+						break;
+					case 4:
+						truncGram(syn0, layer1_size,ngram,offset,wordVec,lenWord,gramCpt);
+						break;
+					case 5:
+						sumFreqGram(syn0, layer1_size,offset,wordVec,voc->vocab[indGram].cn);
+				}
+
+				gramCpt++;
+				end++;
+				start++;
+			}
+
+			//normalization
+			for(i=0;i<layer1_size;i++){
+					wordVec[i] /= gramCpt;
 			}
 			
-			switch(group_vec){
-				case 0:
-				case 1:
-					sumGram(syn0, layer1_size, offset,wordVec);
-					break;
-				case 2:
-					minmaxGram(syn0, layer1_size,offset,wordVec,1);
-					break;
-				case 3:
-					minmaxGram(syn0, layer1_size,offset,wordVec,0);
-					break;
-				case 4:
-					truncGram(syn0, layer1_size,ngram,offset,wordVec,lenWord,gramCpt);
-					break;
-				case 5:
-					sumFreqGram(syn0, layer1_size,offset,wordVec,voc->vocab[indGram].cn);
-			}
 
-			gramCpt++;
-			end++;
-			start++;
 		}
+		else
+		{
+			indGram = SearchVocab(voc,word);
 
-		if(group_vec==1){
-			for(i=0;i<layer1_size;i++){
-				wordVec[i] /= 2;
+			if(indGram > -1){
+
+				offset = indGram * layer1_size;
+				for (i=0; i < layer1_size;i++)
+				{
+					wordVec[i]+=syn0[offset+i];
+				}
+
+			}
+			else{
+				unexistCpt++;
 			}
 		}
 
-		//normalization
-		for(i=0;i<layer1_size;i++){
-				wordVec[i] /= gramCpt;
-		}
-		
+
 		hashset[hash] = 1;		
 		gramCpt = 0;
 
 		//removes #bangs
-		if(hashbang > 0){
+		if(hashbang > 0)
+		{
 			for(i=1;i<lenWord;i++){
 				word[i-1]=word[i];
 			}
@@ -217,6 +239,7 @@ void addGramPosition(char* word, char * gram, int size, int index, int position,
 	int i;
 	char num[3];
 	int lenWord = strlen(word);
+	int lenGram = strlen(gram);
 	int lastIndex;
 
 	if(overlap)
@@ -224,12 +247,14 @@ void addGramPosition(char* word, char * gram, int size, int index, int position,
 	else
 		lastIndex = lenWord/size-1;
 	
-
+	if(lastIndex == 0)
+		return; 
 
 	if(position==1){
 		/*	Adds '-' /!\ intended for no hashbangs */
 
-		if(index==0) //first index
+
+		if(index==0 ) //first index
 		{
 			gram[size]='-';
 			gram[size+1]='\0'; 
@@ -238,7 +263,7 @@ void addGramPosition(char* word, char * gram, int size, int index, int position,
 
 		if(index == lastIndex) //last index
 		{
-			for(i=size+1;i>0;i--){
+			for(i=lenGram+1;i>0;i--){
 				gram[i]=gram[i-1];
 			}
 			gram[0]='-';
@@ -246,7 +271,7 @@ void addGramPosition(char* word, char * gram, int size, int index, int position,
 			return;
 		}
 
-		for(i=size+1;i>0;i--){
+		for(i=lenGram+1;i>0;i--){
 			gram[i]=gram[i-1];
 		}
 			gram[0]='-';
@@ -263,9 +288,9 @@ void addGramPosition(char* word, char * gram, int size, int index, int position,
 		if(index == lastIndex && hashbang)
 			return;
 
-		for(i=size+3;i>=3;i--)
+		for(i= lenGram+1;i>=0;i--)
 		{
-			gram[i]=gram[i-3];
+			gram[i+3]=gram[i];
 		}
 		
 		sprintf(num,"%d",index);
@@ -297,12 +322,12 @@ int getGrams(char* word, char* gram, int index, int size,int overlap,int positio
 		return 0;
 
 	if(lenWord <= size){
-		return -1;
+		return -1; //usefull for training threads
 	}
 
 	int start,i;
 
-	for(i = 0;i<size+4;i++) //gram = ngram+4 (convention)
+	for(i = 0;i<size*2+4;i++) //gram = ngram*2+4 (convention - see vocab.c -> LearnNGramFromTrainFile)
 		gram[i]=0; //reset gram
 
 	if(overlap){
@@ -323,8 +348,9 @@ int getGrams(char* word, char* gram, int index, int size,int overlap,int positio
 		start = index * size;
 	
 		i=0;
-		int f
-		if(start+size > lenWord || lenWord-(start+size) <= 2){
+
+		if(start+size > lenWord || lenWord-(start+size) <= 2)
+		{
 			while(word[start+i] != '\0'){
 				gram[i] = word[start+i];
 				i++;
@@ -339,9 +365,6 @@ int getGrams(char* word, char* gram, int index, int size,int overlap,int positio
 			gram[size]='\0';
 		}
 
-		
-		
-		
 
 		if(position > 0)
 			addGramPosition(word,gram,size,index,position,overlap, hashbang);
