@@ -41,7 +41,7 @@ int EXP_TABLE_SIZE = 1000;
 char train_file[MAX_STRING], output_file[MAX_STRING];
 char save_vocab_file[MAX_STRING], read_vocab_file[MAX_STRING];
 
-int words = 1, binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 0, num_threads = 1, min_reduce = 0, ngram = 3, hashbang = 1, group_vec = 0;
+int binary = 0, cbow = 0, debug_mode = 2, window = 5, min_count = 0, num_threads = 1, min_reduce = 0, ngram = 3, hashbang = 1, group_vec = -1, overlap = 1;
 int layer1_size = 100, position = 1;
 
 long long word_count_actual = 0, file_size = 0, classes = 0;
@@ -178,6 +178,8 @@ void TrainModel(vocabulary* voc) {
 			negative,
 			table_size,
 			position,
+			overlap,
+			hashbang,
 			train_file
 			);
 
@@ -188,7 +190,7 @@ void TrainModel(vocabulary* voc) {
 		else
 			pthread_create(&pt[a], NULL, TrainSKIPModelThreadGram, (void *)params);
 	}
-
+	printf("Launched all threads\n");
 	for (a = 0; a < num_threads; a++)
 		pthread_join(pt[a], NULL);
 
@@ -231,9 +233,9 @@ int main(int argc, char **argv) {
 		printf("\t-size <int>\n");
 		printf("\t\tSet size of word vectors; default is 100\n");
 		printf("\t-window <int>\n");
-		printf("\t\tSet max skip length between words; default is 5\n");
+		printf("\t\tSet max skip length between grams; default is 5\n");
 		printf("\t-sample <float>\n");
-		printf("\t\tSet threshold for occurrence of words. Those that appear with higher frequency");
+		printf("\t\tSet threshold for occurrence of grams. Those that appear with higher frequency");
 		printf(" in the training data will be randomly down-sampled; default is 0 (off), useful value is 1e-5\n");
 		printf("\t-hs <int>\n");
 		printf("\t\tUse Hierarchical Softmax; default is 1 (0 = not used)\n");
@@ -242,26 +244,26 @@ int main(int argc, char **argv) {
 		printf("\t-threads <int>\n");
 		printf("\t\tUse <int> threads (default 1)\n");
 		printf("\t-min-count <int>\n");
-		printf("\t\tThis will discard words that appear less than <int> times; default is 0\n");
+		printf("\t\tThis will discard grams that appear less than <int> times; default is 0\n");
 		printf("\t-alpha <float>\n");
 		printf("\t\tSet the starting learning rate; default is 0.025\n");
 		printf("\t-binary <int>\n");
 		printf("\t\tSave the resulting vectors in binary moded; default is 0 (off)\n");
 		printf("\t-cbow <int>\n");
 		printf("\t\tUse the continuous bag of words model; default is 0 (skip-gram model)\n");
-		printf("\t-ngram <int> (default 0 - use words) \n");
-		printf("\t\tUse N-GRAM model instead of words to train vectors \n");
+		printf("\t-ngram <int> (default 3) \n");
+		printf("\t\tSize of the Ngrams \n");
 		printf("\t-hashbang <0-1> (default 0)\n");
-		printf("\t\tUse hashbang on n-grams - i.e #good# -> #go,goo,ood,od#\n");
-		printf("\t-group <0-5> (default 0)\n");
-		printf("\t\tHow word vectors are computed with n-grams - 0:Sum (default); 1:Mean; 2:Min; 3:Max; 4:Trunc; 5:FreqSum\n");
-		printf("\t-pos <0-1-2> (default 0) - 1: #good# -> #g go- -oo- -od d# 2: -> #g 01-go 02-oo 03-od d# \n");
+		printf("\t\tUse hashbang on n-grams - i.e good -> #good# \n");
+		printf("\t-group <0-5> (default -1, vectors are ngrams)\n");
+		printf("\t\tHow word vectors are computed with n-grams - 0:Sum; 1:Mean; 2:Min; 3:Max; 4:Trunc; 5:FreqSum\n");
+		printf("\t-over <0-1> (default 1) - 1: #good# -> #g go oo od d# 0: -> #g  oo  d#\n");
+		printf("\t\t Types of ngram - overlapping (1) or not (0) \n");
+		printf("\t-pos <0-1-2> (default 0) 0: none - 1: #good# -> #g go- -oo- -od d# - 2: -> #g 01-go 02-oo 03-od d# \n");
 		printf("\t\tAdds position indication to ngrams\n");
-		printf("\t-words <0-1> (default 1) \n");
-		printf("\t\tproduce word vector with words from training file\n");
 		
 		printf("\nExamples:\n");
-		printf("./word2vec -train data.txt -output vec.txt -debug 2 -size 200 -window 5 -sample 1e-4 -negative 5 -hs 0 -binary 0 -cbow 1\n\n");
+		printf("./word2gram -train data.txt -output vec.txt -ngram 4 -hashbang 1 -group 0 -size 200 -sample 1e-4 -negative 5 -hs 1 -binary 0 \n\n");
 		return 0;
 	}
 
@@ -285,7 +287,7 @@ int main(int argc, char **argv) {
 	if ((i = ArgPos ((char *) "-hashbang", argc, argv)) > 0 ) hashbang = atoi(argv[i + 1]);
 	if ((i = ArgPos ((char *) "-group", argc, argv)) > 0 ) group_vec = atoi(argv[i + 1]);
 	if ((i = ArgPos ((char *) "-pos", argc, argv)) > 0 ) position = atoi(argv[i + 1]);
-	if ((i = ArgPos ((char *) "-words", argc, argv)) > 0 ) words = atoi(argv[i + 1]);
+	if ((i = ArgPos ((char *) "-over", argc, argv)) > 0 ) overlap = atoi(argv[i + 1]);
 	
 	expTable = (real *)malloc((EXP_TABLE_SIZE + 1) * sizeof(real));
 
@@ -300,12 +302,11 @@ int main(int argc, char **argv) {
 	int vocab_hash_size =  10000000;  // Maximum 30 * 0.7 = 21M words in the vocabulary
 	int vocab_max_size = 1000;
 
-
 	//1: init vocabulary
 	vocabulary* vocab = InitVocabulary(vocab_hash_size,vocab_max_size);
 
 	//2: load vocab
-	file_size = LearnNGramFromTrainFile(vocab,train_file,min_count,ngram,hashbang,position);
+	file_size = LearnNGramFromTrainFile(vocab,train_file,min_count,ngram,hashbang,position,overlap);
 
 	if (output_file[0] == 0) //nowhere to output => quit
 		return 0;
@@ -314,9 +315,9 @@ int main(int argc, char **argv) {
 	TrainModel(vocab);
 	
 	//4: make word vectors
-	printf("Creating word vectors.\n");
-	if(words)
-		gramVocToWordVec(vocab,syn0,MAX_STRING,layer1_size,ngram,hashbang,group_vec,binary,position,train_file,output_file);
+	printf("Creating vectors.\n");
+	if(group_vec != -1)
+		gramVocToWordVec(vocab,syn0,MAX_STRING,layer1_size,ngram,hashbang,group_vec,binary,position,overlap,train_file,output_file);
 	else
 		writeGrams(vocab,syn0,layer1_size,ngram,hashbang,position,output_file,binary);
 

@@ -1,4 +1,5 @@
 #include "trainingThread.h"
+#include "ngram_tools.h"
 #define DEBUG_MODE 2
 
 threadParameters * CreateParametersStruct(vocabulary* voc,
@@ -24,6 +25,8 @@ threadParameters * CreateParametersStruct(vocabulary* voc,
 	int negative,
 	int table_size,
 	int position,
+	int overlap,
+	int hashbang,
 	char* train_file){
 
 	threadParameters * params = (threadParameters*)malloc(sizeof(threadParameters));
@@ -52,6 +55,8 @@ threadParameters * CreateParametersStruct(vocabulary* voc,
 	params->position = position;
 	params->table_size = table_size;
 	params->train_file = train_file;
+	params->overlap = overlap;
+	params->hashbang = hashbang;
 
 	return params;
 
@@ -313,6 +318,8 @@ void *TrainCBOWModelThreadGram(void *arg) {
 	int EXP_TABLE_SIZE = params->exp_table_size;
 	int table_size = params->table_size;
 	int position = params->position;
+	int overlap = params->overlap;
+	int hashbang = params->hashbang;
 	long long int *word_count_actual = params->word_count_actual; //shared
 	int *table = params->table;
 	char *train_file = params->train_file;
@@ -341,9 +348,7 @@ void *TrainCBOWModelThreadGram(void *arg) {
 	char wordToGram[MAX_STRING];
 	char gram[ngram+3];
 	int start = 0;
-	int end = ngram-1;
-	int newWord = 1;
-	int wordLength = 0;
+	int end;
 
 	real *neu1 = (real *)calloc(layer1_size, sizeof(real)); //one vector
 	real *neu1e = (real *)calloc(layer1_size, sizeof(real)); 
@@ -374,50 +379,45 @@ void *TrainCBOWModelThreadGram(void *arg) {
 
 		if (sentence_length == 0) {
 
+			wordToGram[0] = '\0'; //so length is 0
+			end = 0;
+
 			while (1) {
-				
+
+
 
 				if (feof(fi))
-					break;
-					
-				if(newWord){
-					ReadWordHashbang(wordToGram, fi);
-					start = 0;
-					end = ngram-1;
-					wordLength = strlen(wordToGram);
-				
-					newWord = 0;
+					break;	
+
+				if(end == 0){
+					if(hashbang)
+						ReadWordHashbang(wordToGram, fi);
+					else
+						ReadWord(wordToGram,fi);
+					i = 0;
 				}
 
-				if(wordLength <= ngram){
-					word =  SearchVocab(voc,wordToGram);
-					newWord = 1;
-					continue;
-				}
-				
-				for (i = 0; i < ngram; i++)
-				{
-					gram[i] = wordToGram[start+i];
-				}
-				gram[ngram] = '\0';
+				end = getGrams(wordToGram,gram,i, ngram, overlap, position,hashbang);
 
-				if(position)
-					addGramPosition(gram,ngram,start,end,wordLength,position);
-
-				word = SearchVocab(voc, gram);
-				
-				end++;
-				start++;
-
-				if(end == wordLength)
-					newWord = 1;	
-
-				if (word == -1)
-					continue;
+				if(end == -1)
+					word = SearchVocab(voc,wordToGram);
+				else
+					word = SearchVocab(voc, gram);	
 
 				word_count++;
+				i += 1;
 
-				if (word == 0)
+				if(end == 0){
+					continue;
+				}
+
+				if (end == -1)
+					end = 0;
+
+				if (word == -1)
+					continue;		
+
+				if (word == 0) //context break
 					break;
 
 				// The subsampling randomly discards frequent words while keeping the ranking same
@@ -428,11 +428,13 @@ void *TrainCBOWModelThreadGram(void *arg) {
 					if (ran < (next_random & 0xFFFF) / (real)65536)
 						continue;
 				}
+
 				sen[sentence_length] = word;
 				sentence_length++;
 
 				if (sentence_length >= MAX_SENTENCE_LENGTH)
 					break;
+
 			}
 			
 			sentence_position = 0;
@@ -817,6 +819,8 @@ void *TrainSKIPModelThreadGram(void *arg) {
 	int hs = params->hs;
 	int negative = params->negative;
 	int position = params->position;
+	int overlap = params->overlap;
+	int hashbang = params->hashbang;
 	int EXP_TABLE_SIZE = params->exp_table_size;
 	int table_size = params->table_size;
 	long long int *word_count_actual = params->word_count_actual; //shared
@@ -846,8 +850,6 @@ void *TrainSKIPModelThreadGram(void *arg) {
 	char gram[ngram+3];
 	int start = 0;
 	int end = ngram-1;
-	int newWord = 1;
-	int wordLength = 0;
 
 	real *neu1 = (real *)calloc(layer1_size, sizeof(real)); //one vector
 	real *neu1e = (real *)calloc(layer1_size, sizeof(real)); 
@@ -878,51 +880,43 @@ void *TrainSKIPModelThreadGram(void *arg) {
 
 		if (sentence_length == 0) {
 
+			wordToGram[0] = '\0'; //so length is 0
+			end = 0;
+
 			while (1) {
 
 				if (feof(fi))
 					break;	
-					
-				if(newWord){
-					ReadWordHashbang(wordToGram, fi);
-					start = 0;
-					end = ngram-1;
-					wordLength = strlen(wordToGram);
-				
-					newWord = 0;
-				}
-				
 
-				if(wordLength <= ngram){
-					word =  SearchVocab(voc,wordToGram);
-					newWord = 1;
+				if(end == 0){
+					if(hashbang)
+						ReadWordHashbang(wordToGram, fi);
+					else
+						ReadWord(wordToGram,fi);
+					i = 0;
+				}
+
+				end = getGrams(wordToGram,gram,i, ngram, overlap, position,hashbang);
+
+				if(end == -1)
+					word = SearchVocab(voc,wordToGram);
+				else
+					word = SearchVocab(voc, gram);	
+
+				word_count++;
+				i += 1;
+
+				if(end == 0){
 					continue;
 				}
 
-				
-				for (i = 0; i < ngram; i++)
-				{
-					gram[i] = wordToGram[start+i];
-				}
-				gram[ngram] = '\0';
-
-				if(position)
-					addGramPosition(gram,ngram,start,end,wordLength,position);
-
-				word = SearchVocab(voc, gram);
-				
-				end++;
-				start++;
-
-				if(end == wordLength)
-					newWord = 1;		
+				if (end == -1)
+					end = 0;
 
 				if (word == -1)
 					continue;
 
-				word_count++;
-
-				if (word == 0)
+				if (word == 0) //context break
 					break;
 
 				// The subsampling randomly discards frequent words while keeping the ranking same
@@ -933,11 +927,14 @@ void *TrainSKIPModelThreadGram(void *arg) {
 					if (ran < (next_random & 0xFFFF) / (real)65536)
 						continue;
 				}
+
 				sen[sentence_length] = word;
 				sentence_length++;
 
 				if (sentence_length >= MAX_SENTENCE_LENGTH)
 					break;
+
+				
 			}
 			
 			sentence_position = 0;
