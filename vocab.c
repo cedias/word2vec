@@ -428,7 +428,6 @@ long long LearnNGramFromTrainFile(vocabulary* voc, char* train_file,int min_coun
 
 
 		i=0;
-		
 		while(getGrams(word,gram,i, ngram, overlap, position,hashbang)){
 			searchAndAddToVocab(voc,gram);
 			i++;
