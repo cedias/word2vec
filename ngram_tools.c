@@ -316,7 +316,6 @@ int getGrams(char* word, char* gram, int index, int size,int overlap,int positio
 		lastIndex = lenWord-size;
 	else
 		lastIndex = lenWord/size-1;
-	
 
 	if(index > lastIndex)
 		return 0;
@@ -349,14 +348,13 @@ int getGrams(char* word, char* gram, int index, int size,int overlap,int positio
 	
 		i=0;
 
-		if(start+size > lenWord || lenWord-(start+size) <= 2)
+		if(index == lastIndex)
 		{
 			while(word[start+i] != '\0'){
 				gram[i] = word[start+i];
 				i++;
 			}
 			gram[i] = '\0';
-
 		}
 		else 
 		{
