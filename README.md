@@ -1,4 +1,4 @@
-Tools for computing distributed representtion of words
+Tools for computing distributed represention of words (and Grams)
 ------------------------------------------------------
 
 We provide an implementation of the Continuous Bag-of-Words (CBOW) and the Skip-gram model (SG), as well as several demo scripts.
